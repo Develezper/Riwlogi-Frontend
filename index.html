@@ -7,13 +7,14 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 </head>
 <body class="bg-zinc-950 text-zinc-100 min-h-screen font-sans antialiased">
+  <a href="#main" class="skip-link">Saltar al contenido principal</a>
   <!--  App Shell  -->
   <div id="app" class="flex flex-col min-h-screen">
     <!-- Navbar se inyecta por JS -->
     <nav id="navbar"></nav>
 
     <!-- Main content (SPA router) -->
-    <main id="main" class="flex-1"></main>
+    <main id="main" class="flex-1" tabindex="-1"></main>
 
     <!-- Toast / notificaciones -->
     <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
