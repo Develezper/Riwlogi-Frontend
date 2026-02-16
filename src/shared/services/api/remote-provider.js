@@ -18,11 +18,13 @@ const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const TOKEN_KEY = "Riwlog_token";
 
 export class ApiHttpError extends Error {
-  constructor(status, message, payload = null) {
+  constructor(status, message, payload = null, diagnostics = null) {
     super(message || `HTTP ${status}`);
     this.name = "ApiHttpError";
     this.status = status;
     this.payload = payload;
+    this.url = diagnostics?.url || null;
+    this.contentType = diagnostics?.contentType || null;
   }
 }
 
@@ -73,6 +75,7 @@ async function request(endpoint, { body, query, params, requireAuth = false, tim
     response = await withTimeout(
       window.fetch(url, {
         method,
+        mode: "cors",
         headers: {
           ...(body ? { "Content-Type": "application/json" } : {}),
           ...(requireAuth ? authHeader() : {}),
@@ -98,31 +101,105 @@ async function request(endpoint, { body, query, params, requireAuth = false, tim
       response.statusText ||
       "Request failed";
 
-    throw new ApiHttpError(response.status, String(message), payload);
+    throw new ApiHttpError(response.status, String(message), payload, {
+      url: response.url || url,
+      contentType,
+    });
   }
 
-  return payload;
+  return {
+    payload,
+    meta: {
+      url: response.url || url,
+      status: response.status,
+      contentType,
+    },
+  };
+}
+
+function payloadType(value) {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value;
+}
+
+function formatHealthDiagnostic({ url, status, contentType, reason }) {
+  const resolvedUrl = url || `${API_BASE}${API_CONTRACT.health.path}`;
+  const resolvedStatus = typeof status === "number" ? String(status) : "n/a";
+  const resolvedType = contentType || "unknown";
+  return `Health check failed. url=${resolvedUrl} status=${resolvedStatus} content-type=${resolvedType} reason=${reason}`;
 }
 
 export const remoteApi = {
   async healthCheck() {
-    const payload = await request(API_CONTRACT.health, {
-      timeoutMs: 1000,
-    });
+    const healthUrl = buildUrl(API_CONTRACT.health);
 
-    return parseHealthResponse(payload);
+    let result;
+    try {
+      result = await request(API_CONTRACT.health, {
+        timeoutMs: 1000,
+      });
+    } catch (error) {
+      if (error instanceof ApiHttpError) {
+        throw new Error(
+          formatHealthDiagnostic({
+            url: error.url || healthUrl,
+            status: error.status,
+            contentType: error.contentType,
+            reason: error.message,
+          }),
+        );
+      }
+
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        formatHealthDiagnostic({
+          url: healthUrl,
+          status: null,
+          contentType: null,
+          reason,
+        }),
+      );
+    }
+
+    const { payload, meta } = result;
+    const isObject = payload && typeof payload === "object" && !Array.isArray(payload);
+    if (!isObject) {
+      throw new Error(
+        formatHealthDiagnostic({
+          url: meta.url,
+          status: meta.status,
+          contentType: meta.contentType,
+          reason: `expected JSON object but received ${payloadType(payload)}`,
+        }),
+      );
+    }
+
+    try {
+      return parseHealthResponse(payload);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        formatHealthDiagnostic({
+          url: meta.url,
+          status: meta.status,
+          contentType: meta.contentType,
+          reason,
+        }),
+      );
+    }
   },
 
   auth: {
     async login({ email, password }) {
-      const payload = await request(API_CONTRACT.authLogin, {
+      const { payload } = await request(API_CONTRACT.authLogin, {
         body: { email, password },
       });
       return parseAuthResponse(payload);
     },
 
     async register({ username, email, password }) {
-      const payload = await request(API_CONTRACT.authRegister, {
+      const { payload } = await request(API_CONTRACT.authRegister, {
         body: { username, email, password },
       });
       return parseAuthResponse(payload);
@@ -131,28 +208,28 @@ export const remoteApi = {
 
   problems: {
     async list(params = {}) {
-      const payload = await request(API_CONTRACT.problemsList, {
+      const { payload } = await request(API_CONTRACT.problemsList, {
         query: params,
       });
       return parseProblemsListResponse(payload);
     },
 
     async get(slug) {
-      const payload = await request(API_CONTRACT.problemBySlug, {
+      const { payload } = await request(API_CONTRACT.problemBySlug, {
         params: { slug },
       });
       return parseProblemResponse(payload);
     },
 
     async tags() {
-      const payload = await request(API_CONTRACT.problemTags);
+      const { payload } = await request(API_CONTRACT.problemTags);
       return parseTagsResponse(payload);
     },
   },
 
   submissions: {
     async start(problemId, language = "python") {
-      const payload = await request(API_CONTRACT.submissionStart, {
+      const { payload } = await request(API_CONTRACT.submissionStart, {
         requireAuth: true,
         body: { problem_id: problemId, language },
       });
@@ -161,7 +238,7 @@ export const remoteApi = {
     },
 
     async run(data) {
-      const payload = await request(API_CONTRACT.submissionRun, {
+      const { payload } = await request(API_CONTRACT.submissionRun, {
         requireAuth: true,
         body: data,
       });
@@ -170,7 +247,7 @@ export const remoteApi = {
     },
 
     async submit(submissionId) {
-      const payload = await request(API_CONTRACT.submissionSubmit, {
+      const { payload } = await request(API_CONTRACT.submissionSubmit, {
         requireAuth: true,
         params: { id: submissionId },
       });
@@ -179,7 +256,7 @@ export const remoteApi = {
     },
 
     async sendEvents(submissionId, events = []) {
-      const payload = await request(API_CONTRACT.submissionEvents, {
+      const { payload } = await request(API_CONTRACT.submissionEvents, {
         requireAuth: true,
         params: { id: submissionId },
         body: { events },
@@ -191,7 +268,7 @@ export const remoteApi = {
 
   leaderboard: {
     async get({ timeframe = "all" } = {}) {
-      const payload = await request(API_CONTRACT.leaderboard, {
+      const { payload } = await request(API_CONTRACT.leaderboard, {
         query: { timeframe },
       });
 
@@ -201,14 +278,14 @@ export const remoteApi = {
 
   profile: {
     async me() {
-      const payload = await request(API_CONTRACT.profile, {
+      const { payload } = await request(API_CONTRACT.profile, {
         requireAuth: true,
       });
       return parseProfileResponse(payload);
     },
 
     async submissions() {
-      const payload = await request(API_CONTRACT.profileSubmissions, {
+      const { payload } = await request(API_CONTRACT.profileSubmissions, {
         requireAuth: true,
       });
 
