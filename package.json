@@ -37,6 +37,5 @@
     "@codemirror/view": "^6.39.14",
     "codemirror": "^6.0.2",
     "marked": "^17.0.2"
-    "vite": "^7.3.1"
   }
 }
