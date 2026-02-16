@@ -1,0 +1,69 @@
+{
+    "id": "coin-change",
+    "title": "Coin Change",
+    "difficulty": 2,
+    "tags": ["Dynamic Programming", "Arrays"],
+    "acceptance": 41.5,
+    "submissions": 6543,
+    "description": "You are given an integer array `coins` representing coins of different denominations and an integer `amount` representing a total amount of money.\\n\\nReturn the fewest number of coins that you need to make up that amount. If that amount of money cannot be made up by any combination of the coins, return `-1`.",
+    "examples": [
+      {
+        "input": "coins = [1,2,5], amount = 11",
+        "output": "3",
+        "explanation": "11 = 5 + 5 + 1"
+      },
+      { "input": "coins = [2], amount = 3", "output": "-1" }
+    ],
+    "constraints": [
+      "1 <= coins.length <= 12",
+      "1 <= coins[i] <= 2^31 - 1",
+      "0 <= amount <= 10^4"
+    ],
+    "starterCode": {
+      "python": "class Solution:\\n    def coinChange(self, coins: list[int], amount: int) -> int:\\n        # Write your solution here\\n        pass",
+      "javascript": "/**\\n * @backend/.venv/lib/python3.13/site-packages/numpy/f2py/tests/__pycache__/test_parameter.cpython-313.pyc {number[]} coins\\n * @backend/.venv/lib/python3.13/site-packages/numpy/f2py/tests/__pycache__/test_parameter.cpython-313.pyc {number} amount\\n */\\nvar coinChange = function(coins, amount) {\\n    // Write your solution here\\n};",
+      "typescript": "function coinChange(coins: number[], amount: number): number {\\n    // Write your solution here\\n    return -1;\\n};"
+    },
+    "stages": [
+      {
+        "stage_index": 1,
+        "prompt_md": "Implement the solution for stage 1.",
+        "time_limit_ms": 1500,
+        "tests": [
+          { "input_text": "coins = [1,2,5], amount = 11", "expected_text": "3", "is_hidden": false },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true }
+        ]
+      },
+      {
+        "stage_index": 2,
+        "prompt_md": "Implement the solution for stage 2.",
+        "time_limit_ms": 1500,
+        "tests": [
+          { "input_text": "coins = [2], amount = 3", "expected_text": "-1", "is_hidden": false },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true }
+        ]
+      },
+      {
+        "stage_index": 3,
+        "prompt_md": "Implement the solution for stage 3.",
+        "time_limit_ms": 1500,
+        "tests": [
+          { "input_text": "coins = [1], amount = 10000", "expected_text": "10000", "is_hidden": false },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true },
+          { "input_text": "hidden input", "expected_text": "hidden expected", "is_hidden": true }
+        ]
+      }
+    ]
+}
