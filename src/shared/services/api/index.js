@@ -128,4 +128,34 @@ export const api = {
       return provider.profile.submissions();
     },
   },
+
+  admin: {
+    async overview() {
+      return provider.admin.overview();
+    },
+
+    async users() {
+      return provider.admin.users();
+    },
+
+    async deleteUser(userId) {
+      return provider.admin.deleteUser(userId);
+    },
+
+    async problems(params = {}) {
+      return provider.admin.problems(params);
+    },
+
+    async generateProblem(payload) {
+      return provider.admin.generateProblem(payload);
+    },
+
+    async updateProblem(problemId, payload) {
+      return provider.admin.updateProblem(problemId, payload);
+    },
+
+    async deleteProblem(problemId) {
+      return provider.admin.deleteProblem(problemId);
+    },
+  },
 };

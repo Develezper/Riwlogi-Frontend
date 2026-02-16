@@ -2,7 +2,7 @@ import { store } from "../state/session-store.js";
 import { router } from "../../app/router.js";
 import { api } from "../services/api/index.js";
 
-const links = [
+const publicLinks = [
   { path: "problems", label: "Problemas" },
   { path: "leaderboard", label: "Leaderboard" },
 ];
@@ -87,6 +87,8 @@ export function renderNavbar() {
 
   const user = store.getUser();
   const isAuth = store.isAuthenticated();
+  const isAdmin = isAuth && user?.role === "admin";
+  const links = isAdmin ? [...publicLinks, { path: "admin", label: "Admin" }] : publicLinks;
   const activePath = currentPath();
   const runtime = api.getRuntime();
   const modeLabel = runtime.activeProvider === "remote" ? "API conectada" : "Modo local";

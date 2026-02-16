@@ -12,6 +12,13 @@ export const API_CONTRACT = Object.freeze({
   leaderboard: { method: "GET", path: "/leaderboard" },
   profile: { method: "GET", path: "/profile/me" },
   profileSubmissions: { method: "GET", path: "/profile/submissions" },
+  adminOverview: { method: "GET", path: "/admin/overview" },
+  adminUsers: { method: "GET", path: "/admin/users" },
+  adminDeleteUser: { method: "DELETE", path: "/admin/users/:id" },
+  adminProblems: { method: "GET", path: "/admin/problems" },
+  adminGenerateProblem: { method: "POST", path: "/admin/problems/generate" },
+  adminUpdateProblem: { method: "PATCH", path: "/admin/problems/:id" },
+  adminDeleteProblem: { method: "DELETE", path: "/admin/problems/:id" },
 });
 
 export class ApiContractError extends Error {
@@ -43,6 +50,11 @@ function assertNumber(value, context) {
   return value;
 }
 
+function assertBoolean(value, context) {
+  assert(typeof value === "boolean", `${context} must be boolean`, value);
+  return value;
+}
+
 function assertArray(value, context) {
   assert(Array.isArray(value), `${context} must be an array`, value);
   return value;
@@ -61,6 +73,7 @@ function validateUser(raw, context = "user") {
     id: assertString(value.id, `${context}.id`),
     username: assertString(value.username, `${context}.username`),
     email: assertString(value.email, `${context}.email`),
+    role: value.role === "admin" ? "admin" : "user",
     display_name: assertString(value.display_name || value.username, `${context}.display_name`),
     created_at: assertString(value.created_at || new Date().toISOString(), `${context}.created_at`),
   };
@@ -216,6 +229,85 @@ function validateProfileSubmission(raw, index) {
   };
 }
 
+function validateAdminOverview(raw) {
+  const value = assertObject(raw, "admin.overview");
+  const kpis = assertObject(value.kpis || {}, "admin.overview.kpis");
+  const topTags = assertArray(value.top_tags || [], "admin.overview.top_tags");
+  const recentActivity = assertArray(value.recent_activity || [], "admin.overview.recent_activity");
+
+  return {
+    kpis: {
+      total_users: Number(kpis.total_users || 0),
+      active_users_7d: Number(kpis.active_users_7d || 0),
+      total_problems: Number(kpis.total_problems || 0),
+      published_problems: Number(kpis.published_problems || 0),
+      draft_problems: Number(kpis.draft_problems || 0),
+      total_submissions: Number(kpis.total_submissions || 0),
+      accepted_submissions: Number(kpis.accepted_submissions || 0),
+      acceptance_rate: Number(kpis.acceptance_rate || 0),
+      ai_generated_problems: Number(kpis.ai_generated_problems || 0),
+    },
+    top_tags: topTags.map((row, index) => {
+      const item = assertObject(row, `admin.overview.top_tags[${index}]`);
+      return {
+        tag: assertString(item.tag, `admin.overview.top_tags[${index}].tag`),
+        count: Number(item.count || 0),
+      };
+    }),
+    recent_activity: recentActivity.map((row, index) => {
+      const item = assertObject(row, `admin.overview.recent_activity[${index}]`);
+      return {
+        id: assertString(item.id || `activity_${index + 1}`, `admin.overview.recent_activity[${index}].id`),
+        type: assertString(item.type || "system", `admin.overview.recent_activity[${index}].type`),
+        label: assertString(item.label || "-", `admin.overview.recent_activity[${index}].label`),
+        created_at: assertString(
+          item.created_at || new Date().toISOString(),
+          `admin.overview.recent_activity[${index}].created_at`,
+        ),
+      };
+    }),
+    updated_at: assertString(value.updated_at || new Date().toISOString(), "admin.overview.updated_at"),
+  };
+}
+
+function validateAdminUser(raw, index) {
+  const value = assertObject(raw, `admin.users.items[${index}]`);
+  const baseUser = validateUser(value, `admin.users.items[${index}]`);
+  const role = String(value.role || "user");
+
+  return {
+    ...baseUser,
+    role,
+    is_admin: typeof value.is_admin === "boolean" ? value.is_admin : role === "admin",
+    submissions_count: Number(value.submissions_count || 0),
+    solved_count: Number(value.solved_count || 0),
+    last_active_at: value.last_active_at ? String(value.last_active_at) : null,
+  };
+}
+
+function validateAdminProblem(raw, index) {
+  const value = assertObject(raw, `admin.problems.items[${index}]`);
+  const problem = validateProblem(value);
+  const status = String(value.status || "draft");
+  const source = String(value.source || "custom");
+
+  return {
+    ...problem,
+    status,
+    source,
+    ai_generated: typeof value.ai_generated === "boolean" ? value.ai_generated : source === "ai",
+    created_at: assertString(
+      value.created_at || new Date().toISOString(),
+      `admin.problems.items[${index}].created_at`,
+    ),
+    updated_at: assertString(
+      value.updated_at || value.created_at || new Date().toISOString(),
+      `admin.problems.items[${index}].updated_at`,
+    ),
+    last_generated_prompt: value.last_generated_prompt ? String(value.last_generated_prompt) : "",
+  };
+}
+
 export function parseHealthResponse(payload) {
   const value = assertObject(payload, "health");
   assert(value.ok === true || value.status === "ok", "health response must contain ok=true or status='ok'", payload);
@@ -289,4 +381,48 @@ export function parseProfileSubmissionsResponse(payload) {
   const value = assertObject(payload, "profile submissions response");
   const items = assertArray(value.items, "profile submissions response.items");
   return items.map((submission, index) => validateProfileSubmission(submission, index));
+}
+
+export function parseAdminOverviewResponse(payload) {
+  const value = assertObject(payload, "admin overview response");
+  const item = value.item && typeof value.item === "object" ? value.item : value;
+  return validateAdminOverview(item);
+}
+
+export function parseAdminUsersResponse(payload) {
+  if (Array.isArray(payload)) {
+    return payload.map((user, index) => validateAdminUser(user, index));
+  }
+
+  const value = assertObject(payload, "admin users response");
+  const items = assertArray(value.items, "admin users response.items");
+  return items.map((user, index) => validateAdminUser(user, index));
+}
+
+export function parseAdminProblemsResponse(payload) {
+  if (Array.isArray(payload)) {
+    return payload.map((problem, index) => validateAdminProblem(problem, index));
+  }
+
+  const value = assertObject(payload, "admin problems response");
+  const items = assertArray(value.items, "admin problems response.items");
+  return items.map((problem, index) => validateAdminProblem(problem, index));
+}
+
+export function parseAdminProblemMutationResponse(payload) {
+  const value = assertObject(payload, "admin problem mutation response");
+  const item = value.item && typeof value.item === "object" ? value.item : value;
+  return validateAdminProblem(item, 0);
+}
+
+export function parseAdminDeleteResponse(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return { ok: true, message: "" };
+  }
+
+  const value = assertObject(payload, "admin delete response");
+  return {
+    ok: value.ok === undefined ? true : assertBoolean(value.ok, "admin.delete.ok"),
+    message: value.message ? String(value.message) : "",
+  };
 }

@@ -4,6 +4,7 @@ import { leaderboardView } from "../features/leaderboard/views/leaderboard-view.
 import { profileView } from "../features/profile/views/profile-view.js";
 import { loginView } from "../features/auth/views/login-view.js";
 import { registerView } from "../features/auth/views/register-view.js";
+import { adminView } from "../features/admin/views/admin-view.js";
 import { store } from "../shared/state/session-store.js";
 
 const routes = [
@@ -12,6 +13,7 @@ const routes = [
   { path: "problem/:slug", view: problemSolverView, auth: true },
   { path: "leaderboard", view: leaderboardView },
   { path: "profile", view: profileView, auth: true },
+  { path: "admin", view: adminView, auth: true },
   { path: "login", view: loginView },
   { path: "register", view: registerView },
 ];
