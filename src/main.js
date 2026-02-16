@@ -1,1 +1,7 @@
-import "./app/bootstrap.js";
+import './style.css'
+
+document.querySelector('#app').innerHTML = `
+  <div>
+
+  </div>
+`
