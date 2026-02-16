@@ -1,4 +1,4 @@
-import { getAllProblems, getAllTags, getProblemBySlug } from "../problem-repository.js";
+import { getAllProblems } from "../problem-repository.js";
 
 const DB_KEY = "Riwlog_local_db_v2";
 const TOKEN_KEY = "Riwlog_token";
@@ -21,11 +21,21 @@ const LEADERBOARD_SEED = [
 
 const DEFAULT_USERS = [
   {
+    id: "user_admin",
+    username: "admin",
+    email: "admin@riwlog.dev",
+    password: "123456",
+    display_name: "Admin",
+    role: "admin",
+    created_at: "2025-10-14T10:00:00.000Z",
+  },
+  {
     id: "user_demo",
     username: "demo",
     email: "demo@riwlog.dev",
     password: "123456",
     display_name: "Demo User",
+    role: "admin",
     created_at: "2026-01-03T10:00:00.000Z",
   },
   {
@@ -34,9 +44,12 @@ const DEFAULT_USERS = [
     email: "code@riwlog.dev",
     password: "123456",
     display_name: "Code Ninja",
+    role: "user",
     created_at: "2025-11-22T10:00:00.000Z",
   },
 ];
+
+const BASE_PROBLEMS = getAllProblems().map((problem) => deepClone(problem));
 
 let cachedDb = null;
 
@@ -71,36 +84,85 @@ function writeStorageItem(key, value) {
   window.localStorage.setItem(key, value);
 }
 
+function createEmptyAdminState() {
+  return {
+    custom_problems: [],
+    problem_overrides: {},
+    ai_generations: [],
+  };
+}
+
+function normalizeAdminState(rawAdmin) {
+  if (!rawAdmin || typeof rawAdmin !== "object") {
+    return createEmptyAdminState();
+  }
+
+  const customProblems = Array.isArray(rawAdmin.custom_problems) ? rawAdmin.custom_problems : [];
+  const problemOverrides =
+    rawAdmin.problem_overrides && typeof rawAdmin.problem_overrides === "object"
+      ? rawAdmin.problem_overrides
+      : {};
+  const aiGenerations = Array.isArray(rawAdmin.ai_generations) ? rawAdmin.ai_generations : [];
+
+  return {
+    custom_problems: customProblems,
+    problem_overrides: problemOverrides,
+    ai_generations: aiGenerations,
+  };
+}
+
+function normalizeUserRecord(rawUser) {
+  if (!rawUser || typeof rawUser !== "object") return null;
+  if (!rawUser.id || !rawUser.username || !rawUser.email || !rawUser.password) return null;
+
+  return {
+    ...rawUser,
+    role: rawUser.role === "admin" ? "admin" : "user",
+    created_at: rawUser.created_at || nowIso(),
+  };
+}
+
 function loadDb() {
   if (!isBrowser) {
     return {
-      users: deepClone(DEFAULT_USERS),
+      users: deepClone(DEFAULT_USERS).map(normalizeUserRecord).filter(Boolean),
       sessions: {},
       submissions: [],
+      admin: createEmptyAdminState(),
     };
   }
 
   const raw = window.localStorage.getItem(DB_KEY);
   if (!raw) {
     return {
-      users: deepClone(DEFAULT_USERS),
+      users: deepClone(DEFAULT_USERS).map(normalizeUserRecord).filter(Boolean),
       sessions: {},
       submissions: [],
+      admin: createEmptyAdminState(),
     };
   }
 
   try {
     const parsed = JSON.parse(raw);
+    const parsedUsers = Array.isArray(parsed.users) ? parsed.users : [];
+    const normalizedUsers = parsedUsers.map(normalizeUserRecord).filter(Boolean);
+    const hasAdmin = normalizedUsers.some((user) => user.role === "admin");
+    if (!hasAdmin) {
+      normalizedUsers.unshift(deepClone(DEFAULT_USERS[0]));
+    }
+
     return {
-      users: Array.isArray(parsed.users) ? parsed.users : deepClone(DEFAULT_USERS),
+      users: normalizedUsers.length ? normalizedUsers : deepClone(DEFAULT_USERS).map(normalizeUserRecord).filter(Boolean),
       sessions: parsed.sessions && typeof parsed.sessions === "object" ? parsed.sessions : {},
       submissions: Array.isArray(parsed.submissions) ? parsed.submissions : [],
+      admin: normalizeAdminState(parsed.admin),
     };
   } catch {
     return {
-      users: deepClone(DEFAULT_USERS),
+      users: deepClone(DEFAULT_USERS).map(normalizeUserRecord).filter(Boolean),
       sessions: {},
       submissions: [],
+      admin: createEmptyAdminState(),
     };
   }
 }
@@ -123,6 +185,7 @@ function normalizePublicUser(user) {
     username: user.username,
     email: user.email,
     display_name: user.display_name || user.username,
+    role: user.role === "admin" ? "admin" : "user",
     created_at: user.created_at,
   };
 }
@@ -181,6 +244,355 @@ function getCurrentUserOrThrow() {
   const user = resolveCurrentUser();
   if (!user) throw new Error("Debes iniciar sesión para continuar.");
   return user;
+}
+
+function getCurrentAdminOrThrow() {
+  const user = getCurrentUserOrThrow();
+  if (user.role !== "admin") {
+    throw new Error("No tienes permisos de administrador.");
+  }
+  return user;
+}
+
+function cleanText(value, fallback = "") {
+  const cleaned = String(value || "").trim();
+  return cleaned || fallback;
+}
+
+function normalizeDifficulty(value) {
+  const difficulty = Number(value || 1);
+  if ([1, 2, 3].includes(difficulty)) return difficulty;
+  return 1;
+}
+
+function parseTagList(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return [...new Set(raw.map((tag) => String(tag || "").trim()).filter(Boolean))];
+  }
+
+  return [
+    ...new Set(
+      String(raw || "")
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+function normalizeVisibleTest(raw = {}, index = 0) {
+  return {
+    input_text: cleanText(raw.input_text, `input_${index + 1}`),
+    expected_text: cleanText(raw.expected_text, `output_${index + 1}`),
+  };
+}
+
+function normalizeStageForCatalog(problemId, rawStage = {}, index = 0) {
+  const stageIndex = Number(rawStage.stage_index || index + 1);
+  const visibleTests = Array.isArray(rawStage.visible_tests) ? rawStage.visible_tests : [];
+
+  return {
+    id: cleanText(rawStage.id, `${problemId}-stage-${stageIndex}`),
+    stage_index: stageIndex,
+    prompt_md: cleanText(rawStage.prompt_md, `Resuelve la etapa ${stageIndex}.`),
+    hidden_count: Math.max(0, Number(rawStage.hidden_count || 0)),
+    visible_tests: visibleTests.map((test, testIndex) => normalizeVisibleTest(test, testIndex)),
+  };
+}
+
+function normalizeStarterCode(rawStarter = {}) {
+  const starter = {};
+  Object.entries(rawStarter).forEach(([language, code]) => {
+    const cleanCode = String(code || "").trimEnd();
+    if (!cleanCode) return;
+    starter[String(language || "").trim().toLowerCase()] = cleanCode;
+  });
+
+  if (!starter.python) {
+    starter.python = [
+      "class Solution:",
+      "    def solve(self):",
+      "        # Write your solution here",
+      "        pass",
+    ].join("\n");
+  }
+
+  if (!starter.javascript) {
+    starter.javascript = [
+      "function solve() {",
+      "  // Write your solution here",
+      "}",
+    ].join("\n");
+  }
+
+  return starter;
+}
+
+function normalizeProblemForCatalog(rawProblem = {}, meta = {}) {
+  const id = cleanText(rawProblem.id || rawProblem.slug, cleanText(meta.id, uid("problem")));
+  const slug = cleanText(rawProblem.slug || rawProblem.id, id);
+  const stagesInput = Array.isArray(rawProblem.stages) ? rawProblem.stages : [];
+  const stages = stagesInput.map((stage, index) => normalizeStageForCatalog(slug, stage, index));
+
+  const normalized = {
+    id,
+    slug,
+    title: cleanText(rawProblem.title, "Untitled Challenge"),
+    difficulty: normalizeDifficulty(rawProblem.difficulty),
+    tags: parseTagList(rawProblem.tags),
+    acceptance: Number(rawProblem.acceptance || 0),
+    submissions: Number(rawProblem.submissions || 0),
+    statement_md: cleanText(rawProblem.statement_md, "## Description\nDefine the problem statement."),
+    starter_code: normalizeStarterCode(rawProblem.starter_code || rawProblem.starterCode || {}),
+    stages,
+    stages_count: stages.length,
+    status: cleanText(rawProblem.status, meta.status || "published"),
+    source: cleanText(rawProblem.source, meta.source || "base"),
+    ai_generated: Boolean(rawProblem.ai_generated),
+    created_at: cleanText(rawProblem.created_at, meta.created_at || nowIso()),
+    updated_at: cleanText(rawProblem.updated_at, rawProblem.created_at || meta.created_at || nowIso()),
+    last_generated_prompt: cleanText(rawProblem.last_generated_prompt, ""),
+  };
+
+  return normalized;
+}
+
+function getCatalogForAdmin() {
+  const db = ensureDb();
+  const overrides = db.admin.problem_overrides || {};
+  const customProblems = Array.isArray(db.admin.custom_problems) ? db.admin.custom_problems : [];
+
+  const baseProblems = BASE_PROBLEMS.map((problem) => {
+    const normalizedBase = normalizeProblemForCatalog(problem, {
+      source: "base",
+      status: "published",
+      created_at: "2025-01-01T00:00:00.000Z",
+    });
+    const override = overrides[normalizedBase.slug] || overrides[normalizedBase.id];
+    if (!override) return normalizedBase;
+
+    return normalizeProblemForCatalog(
+      {
+        ...normalizedBase,
+        ...override,
+      },
+      {
+        source: override.source || normalizedBase.source,
+        status: override.status || normalizedBase.status,
+        created_at: override.created_at || normalizedBase.created_at,
+      },
+    );
+  });
+
+  const normalizedCustom = customProblems.map((problem) =>
+    normalizeProblemForCatalog(problem, {
+      source: problem.source || "custom",
+      status: problem.status || "draft",
+      created_at: problem.created_at || nowIso(),
+    }),
+  );
+
+  return [...baseProblems, ...normalizedCustom];
+}
+
+function getPublishedCatalog() {
+  return getCatalogForAdmin().filter((problem) => problem.status !== "archived");
+}
+
+function findProblemInCatalog(problemIdOrSlug) {
+  const cleanId = String(problemIdOrSlug || "").trim().toLowerCase();
+  return (
+    getPublishedCatalog().find(
+      (problem) =>
+        String(problem.id || "").toLowerCase() === cleanId || String(problem.slug || "").toLowerCase() === cleanId,
+    ) || null
+  );
+}
+
+function findAnyProblemInCatalog(problemIdOrSlug) {
+  const cleanId = String(problemIdOrSlug || "").trim().toLowerCase();
+  return (
+    getCatalogForAdmin().find(
+      (problem) =>
+        String(problem.id || "").toLowerCase() === cleanId || String(problem.slug || "").toLowerCase() === cleanId,
+    ) || null
+  );
+}
+
+function upsertAdminProblem(problem, { fromBase = false } = {}) {
+  const db = ensureDb();
+  const normalized = normalizeProblemForCatalog(problem, {
+    source: problem.source || (fromBase ? "base" : "custom"),
+    status: problem.status || "draft",
+    created_at: problem.created_at || nowIso(),
+  });
+
+  const baseExists = BASE_PROBLEMS.some(
+    (base) => base.id === normalized.id || base.slug === normalized.slug,
+  );
+
+  if (fromBase || baseExists) {
+    db.admin.problem_overrides[normalized.slug] = normalized;
+  } else {
+    const index = db.admin.custom_problems.findIndex(
+      (item) => item.id === normalized.id || item.slug === normalized.slug,
+    );
+
+    if (index >= 0) {
+      db.admin.custom_problems[index] = normalized;
+    } else {
+      db.admin.custom_problems.push(normalized);
+    }
+  }
+
+  saveDb();
+  return normalized;
+}
+
+function removeProblemFromAdmin(problemIdOrSlug) {
+  const db = ensureDb();
+  const target = String(problemIdOrSlug || "").trim().toLowerCase();
+
+  const customIndex = db.admin.custom_problems.findIndex(
+    (item) => String(item.id || "").toLowerCase() === target || String(item.slug || "").toLowerCase() === target,
+  );
+
+  if (customIndex >= 0) {
+    db.admin.custom_problems[customIndex].status = "archived";
+    db.admin.custom_problems[customIndex].updated_at = nowIso();
+    saveDb();
+    return;
+  }
+
+  const baseProblem = BASE_PROBLEMS.find(
+    (item) => String(item.id || "").toLowerCase() === target || String(item.slug || "").toLowerCase() === target,
+  );
+  if (!baseProblem) {
+    throw new Error("Problema no encontrado.");
+  }
+
+  const current = db.admin.problem_overrides[baseProblem.slug] || baseProblem;
+  db.admin.problem_overrides[baseProblem.slug] = {
+    ...current,
+    id: baseProblem.id,
+    slug: baseProblem.slug,
+    status: "archived",
+    source: "base",
+    updated_at: nowIso(),
+  };
+  saveDb();
+}
+
+function createAiProblemFromPrompt(payload = {}) {
+  const topic = cleanText(payload.title_hint || payload.topic, "AI Generated Challenge");
+  const prompt = cleanText(payload.prompt, "");
+  const context = cleanText(payload.business_context, "");
+  const constraints = cleanText(payload.constraints, "");
+  const examples = cleanText(payload.examples, "");
+  const rubric = cleanText(payload.evaluation_rubric, "");
+  const stageCount = Math.max(1, Math.min(5, Number(payload.stage_count || 2)));
+  const difficulty = normalizeDifficulty(payload.difficulty);
+  const tags = parseTagList(payload.tags);
+  const targetLanguages = Array.isArray(payload.target_languages)
+    ? payload.target_languages
+    : parseTagList(payload.target_languages);
+  const status = payload.publish ? "published" : "draft";
+
+  const id = cleanText(payload.slug, `${topic.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`);
+  const slug = id;
+  const stages = Array.from({ length: stageCount }, (_, index) => ({
+    id: `${slug}-stage-${index + 1}`,
+    stage_index: index + 1,
+    prompt_md: [
+      `## Stage ${index + 1}`,
+      `Implementa la etapa ${index + 1} para el problema **${topic}**.`,
+      prompt ? `\nPrompt guía IA: ${prompt}` : "",
+      constraints ? `\nRestricciones: ${constraints}` : "",
+    ]
+      .join("\n")
+      .trim(),
+    hidden_count: Math.max(1, Number(payload.hidden_tests_per_stage || 2)),
+    visible_tests: Array.from(
+      { length: Math.max(1, Number(payload.visible_tests_per_stage || 2)) },
+      (_, testIndex) => ({
+        input_text: `case_${index + 1}_${testIndex + 1}`,
+        expected_text: `expected_${index + 1}_${testIndex + 1}`,
+      }),
+    ),
+  }));
+
+  const statementSections = [
+    "## Descripción",
+    `Problema generado por IA para: **${topic}**`,
+    context ? `\n## Contexto\n${context}` : "",
+    prompt ? `\n## Prompt Maestro\n${prompt}` : "",
+    constraints ? `\n## Restricciones\n${constraints}` : "",
+    examples ? `\n## Ejemplos\n${examples}` : "",
+    rubric ? `\n## Criterio de evaluación\n${rubric}` : "",
+  ].filter(Boolean);
+
+  const starterCode = normalizeStarterCode(
+    Object.fromEntries(
+      (targetLanguages.length ? targetLanguages : ["python", "javascript"]).map((language) => [
+        language.toLowerCase(),
+        language.toLowerCase() === "python"
+          ? [
+              "class Solution:",
+              "    def solve(self):",
+              "        # TODO: generated by admin AI flow",
+              "        pass",
+            ].join("\n")
+          : [
+              "function solve() {",
+              "  // TODO: generated by admin AI flow",
+              "}",
+            ].join("\n"),
+      ]),
+    ),
+  );
+
+  const generatedAt = nowIso();
+  const problem = normalizeProblemForCatalog(
+    {
+      id,
+      slug,
+      title: topic,
+      difficulty,
+      tags,
+      statement_md: statementSections.join("\n\n"),
+      starter_code: starterCode,
+      stages,
+      stages_count: stages.length,
+      status,
+      source: "ai",
+      ai_generated: true,
+      created_at: generatedAt,
+      updated_at: generatedAt,
+      last_generated_prompt: prompt,
+    },
+    {
+      source: "ai",
+      status,
+      created_at: generatedAt,
+    },
+  );
+
+  const db = ensureDb();
+  db.admin.ai_generations.unshift({
+    id: uid("ai"),
+    created_at: generatedAt,
+    prompt,
+    topic,
+    stage_count: stageCount,
+    difficulty,
+    tags,
+    problem_id: problem.id,
+  });
+  db.admin.ai_generations = db.admin.ai_generations.slice(0, 25);
+  saveDb();
+
+  return problem;
 }
 
 function findStage(problem, stageId) {
@@ -357,7 +769,7 @@ function computeDifficultyStats(problemIds) {
   const counts = { easy: 0, medium: 0, hard: 0 };
 
   problemIds.forEach((problemId) => {
-    const problem = getProblemBySlug(problemId);
+    const problem = findAnyProblemInCatalog(problemId);
     if (!problem) return;
     if (problem.difficulty === 1) counts.easy += 1;
     if (problem.difficulty === 2) counts.medium += 1;
@@ -405,6 +817,124 @@ function formatSubmission(submission) {
     submitted_at: submission.submitted_at || submission.created_at,
     stage_results: submission.stage_results,
   };
+}
+
+function userSubmissionStats(userId) {
+  const submissions = getUserSubmissions(userId);
+  const accepted = submissions.filter((submission) => submission.verdict === "accepted");
+  const solved = new Set(accepted.map((submission) => submission.problem_id)).size;
+  const lastActiveAt = submissions
+    .map((submission) => submission.submitted_at || submission.created_at)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+
+  return {
+    submissions_count: submissions.length,
+    solved_count: solved,
+    last_active_at: lastActiveAt || null,
+  };
+}
+
+function activeUsersLastDays(days = 7) {
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const active = new Set(
+    ensureDb()
+      .submissions.filter((submission) => {
+        const time = new Date(submission.submitted_at || submission.created_at).getTime();
+        return Number.isFinite(time) && time >= cutoff;
+      })
+      .map((submission) => submission.user_id),
+  );
+  return active.size;
+}
+
+function buildTopTags(limit = 8) {
+  const tagCounter = new Map();
+  getPublishedCatalog().forEach((problem) => {
+    problem.tags.forEach((tag) => {
+      const key = String(tag || "").trim();
+      if (!key) return;
+      tagCounter.set(key, (tagCounter.get(key) || 0) + 1);
+    });
+  });
+
+  return [...tagCounter.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([tag, count]) => ({ tag, count }));
+}
+
+function buildAdminActivity(limit = 10) {
+  const db = ensureDb();
+  const aiActivity = (db.admin.ai_generations || []).map((entry) => ({
+    id: entry.id,
+    type: "ai_generation",
+    label: `Nuevo ejercicio IA: ${entry.topic}`,
+    created_at: entry.created_at,
+  }));
+
+  const latestSubmissions = db.submissions
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.submitted_at || b.created_at).getTime() -
+        new Date(a.submitted_at || a.created_at).getTime(),
+    )
+    .slice(0, limit)
+    .map((submission) => ({
+      id: submission.id,
+      type: "submission",
+      label: `${submission.problem_title} · ${submission.verdict}`,
+      created_at: submission.submitted_at || submission.created_at,
+    }));
+
+  return [...aiActivity, ...latestSubmissions]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, limit);
+}
+
+function buildAdminOverview() {
+  const db = ensureDb();
+  const catalog = getCatalogForAdmin();
+  const publishedProblems = catalog.filter((problem) => problem.status === "published");
+  const draftProblems = catalog.filter((problem) => problem.status === "draft");
+  const aiGenerated = catalog.filter((problem) => problem.ai_generated).length;
+
+  const acceptedSubmissions = db.submissions.filter((submission) => submission.verdict === "accepted").length;
+  const totalSubmissions = db.submissions.length;
+  const acceptanceRate = totalSubmissions ? (acceptedSubmissions / totalSubmissions) * 100 : 0;
+
+  return {
+    kpis: {
+      total_users: db.users.length,
+      active_users_7d: activeUsersLastDays(7),
+      total_problems: catalog.filter((problem) => problem.status !== "archived").length,
+      published_problems: publishedProblems.length,
+      draft_problems: draftProblems.length,
+      total_submissions: totalSubmissions,
+      accepted_submissions: acceptedSubmissions,
+      acceptance_rate: Number(acceptanceRate.toFixed(2)),
+      ai_generated_problems: aiGenerated,
+    },
+    top_tags: buildTopTags(),
+    recent_activity: buildAdminActivity(12),
+    updated_at: nowIso(),
+  };
+}
+
+function parseStagesJsonForUpdate(rawValue, problemSlug) {
+  let parsed = [];
+  try {
+    parsed = JSON.parse(rawValue);
+  } catch {
+    throw new Error("El JSON de etapas es inválido.");
+  }
+
+  if (!Array.isArray(parsed) || !parsed.length) {
+    throw new Error("Debes incluir al menos una etapa válida.");
+  }
+
+  return parsed.map((stage, index) => normalizeStageForCatalog(problemSlug, stage, index));
 }
 
 export const localApi = {
@@ -456,6 +986,7 @@ export const localApi = {
         email: cleanEmail,
         password: cleanPassword,
         display_name: cleanUsername,
+        role: "user",
         created_at: nowIso(),
       };
 
@@ -475,31 +1006,39 @@ export const localApi = {
       const difficulty = params.difficulty ? Number(params.difficulty) : null;
       const search = String(params.search || "").trim().toLowerCase();
       const tag = String(params.tag || "").trim().toLowerCase();
+      const status = String(params.status || "").trim().toLowerCase();
 
-      return getAllProblems().filter((problem) => {
+      return getPublishedCatalog().filter((problem) => {
         const difficultyMatches = !difficulty || problem.difficulty === difficulty;
         const searchMatches = !search || problem.title.toLowerCase().includes(search);
         const tagMatches = !tag || problem.tags.some((item) => item.toLowerCase() === tag);
+        const statusMatches = !status || String(problem.status || "").toLowerCase() === status;
 
-        return difficultyMatches && searchMatches && tagMatches;
+        return difficultyMatches && searchMatches && tagMatches && statusMatches;
       });
     },
 
     async get(slug) {
-      const problem = getProblemBySlug(String(slug || "").trim());
+      const problem = findProblemInCatalog(slug);
       if (!problem) throw new Error("Problema no encontrado.");
       return problem;
     },
 
     async tags() {
-      return getAllTags();
+      return [
+        ...new Set(
+          getPublishedCatalog()
+            .flatMap((problem) => problem.tags)
+            .filter(Boolean),
+        ),
+      ].sort((a, b) => a.localeCompare(b));
     },
   },
 
   submissions: {
     async start(problemId, language = "python") {
       const user = getCurrentUserOrThrow();
-      const problem = getProblemBySlug(problemId);
+      const problem = findProblemInCatalog(problemId);
       if (!problem) throw new Error("Problema inválido.");
 
       const db = ensureDb();
@@ -536,7 +1075,7 @@ export const localApi = {
 
       if (!submission) throw new Error("No se encontró la submission activa.");
 
-      const problem = getProblemBySlug(submission.problem_id);
+      const problem = findAnyProblemInCatalog(submission.problem_id);
       if (!problem) throw new Error("No se encontró el problema de la submission.");
 
       const stage = findStage(problem, stage_id);
@@ -576,7 +1115,7 @@ export const localApi = {
       );
       if (!submission) throw new Error("Submission no encontrada.");
 
-      const problem = getProblemBySlug(submission.problem_id);
+      const problem = findAnyProblemInCatalog(submission.problem_id);
       if (!problem) throw new Error("Problema no encontrado.");
 
       const stageResults = problem.stages
@@ -680,6 +1219,158 @@ export const localApi = {
             new Date(a.submitted_at || a.created_at).getTime(),
         )
         .map(formatSubmission);
+    },
+  },
+
+  admin: {
+    async overview() {
+      getCurrentAdminOrThrow();
+      return buildAdminOverview();
+    },
+
+    async users() {
+      getCurrentAdminOrThrow();
+      const db = ensureDb();
+
+      return db.users
+        .map((user) => {
+          const stats = userSubmissionStats(user.id);
+          return {
+            ...normalizePublicUser(user),
+            role: user.role || "user",
+            is_admin: user.role === "admin",
+            ...stats,
+          };
+        })
+        .sort((a, b) => {
+          if (a.is_admin && !b.is_admin) return -1;
+          if (!a.is_admin && b.is_admin) return 1;
+          return a.username.localeCompare(b.username);
+        });
+    },
+
+    async deleteUser(userId) {
+      const currentAdmin = getCurrentAdminOrThrow();
+      const cleanUserId = String(userId || "").trim();
+      if (!cleanUserId) throw new Error("Usuario inválido.");
+      if (cleanUserId === currentAdmin.id) {
+        throw new Error("No puedes eliminar tu propio usuario administrador.");
+      }
+
+      const db = ensureDb();
+      const user = db.users.find((item) => item.id === cleanUserId);
+      if (!user) throw new Error("Usuario no encontrado.");
+      if (user.role === "admin") {
+        throw new Error("No puedes eliminar otro usuario administrador.");
+      }
+
+      db.users = db.users.filter((item) => item.id !== cleanUserId);
+
+      db.submissions = db.submissions.filter((submission) => submission.user_id !== cleanUserId);
+
+      Object.entries(db.sessions).forEach(([token, session]) => {
+        if (session.user_id === cleanUserId) {
+          delete db.sessions[token];
+        }
+      });
+
+      saveDb();
+      return { ok: true, message: "Usuario eliminado." };
+    },
+
+    async problems(params = {}) {
+      getCurrentAdminOrThrow();
+      const status = String(params.status || "").trim().toLowerCase();
+      const source = String(params.source || "").trim().toLowerCase();
+      const search = String(params.search || "").trim().toLowerCase();
+
+      return getCatalogForAdmin()
+        .filter((problem) => {
+          const matchesStatus = !status || String(problem.status).toLowerCase() === status;
+          const matchesSource = !source || String(problem.source).toLowerCase() === source;
+          const matchesSearch =
+            !search ||
+            problem.title.toLowerCase().includes(search) ||
+            problem.slug.toLowerCase().includes(search);
+
+          return matchesStatus && matchesSource && matchesSearch;
+        })
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    },
+
+    async generateProblem(payload = {}) {
+      getCurrentAdminOrThrow();
+      const generatedProblem = createAiProblemFromPrompt(payload);
+      const status =
+        String(payload.status || "").trim().toLowerCase() === "published" || payload.publish
+          ? "published"
+          : "draft";
+
+      const saved = upsertAdminProblem(
+        {
+          ...generatedProblem,
+          status,
+          source: "ai",
+          ai_generated: true,
+          updated_at: nowIso(),
+        },
+        { fromBase: false },
+      );
+
+      return saved;
+    },
+
+    async updateProblem(problemId, payload = {}) {
+      getCurrentAdminOrThrow();
+      const targetId = String(problemId || "").trim();
+      if (!targetId) throw new Error("Problema inválido.");
+
+      const current = findAnyProblemInCatalog(targetId);
+      if (!current) throw new Error("Problema no encontrado.");
+
+      const immutableSlug = current.source === "base" ? current.slug : null;
+      const tags = payload.tags !== undefined ? parseTagList(payload.tags) : current.tags;
+      const nextSlug = immutableSlug || cleanText(payload.slug, current.slug);
+      const stages =
+        payload.stages_json !== undefined
+          ? parseStagesJsonForUpdate(payload.stages_json, nextSlug)
+          : Array.isArray(payload.stages)
+          ? payload.stages.map((stage, index) => normalizeStageForCatalog(nextSlug, stage, index))
+          : current.stages;
+
+      const merged = normalizeProblemForCatalog(
+        {
+          ...current,
+          ...payload,
+          id: current.id,
+          slug: nextSlug,
+          title: cleanText(payload.title, current.title),
+          difficulty: normalizeDifficulty(payload.difficulty || current.difficulty),
+          tags,
+          statement_md: cleanText(payload.statement_md, current.statement_md),
+          starter_code: normalizeStarterCode(payload.starter_code || current.starter_code),
+          stages,
+          stages_count: stages.length,
+          status: cleanText(payload.status, current.status),
+          updated_at: nowIso(),
+          created_at: current.created_at,
+        },
+        {
+          source: current.source,
+          status: cleanText(payload.status, current.status),
+          created_at: current.created_at,
+        },
+      );
+
+      const fromBase = current.source === "base";
+      const saved = upsertAdminProblem(merged, { fromBase });
+      return saved;
+    },
+
+    async deleteProblem(problemId) {
+      getCurrentAdminOrThrow();
+      removeProblemFromAdmin(problemId);
+      return { ok: true, message: "Problema archivado." };
     },
   },
 };

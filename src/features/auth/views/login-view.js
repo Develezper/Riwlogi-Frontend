@@ -44,7 +44,8 @@ export function loginView(container) {
           </p>
 
           <p class="text-center text-xs text-zinc-600">
-            Demo rápido: <span class="text-zinc-400">demo@riwlog.dev / 123456</span>
+            Demo rápido: <span class="text-zinc-400">demo@riwlog.dev / 123456</span> ·
+            <span class="text-zinc-400">admin@riwlog.dev / 123456</span>
           </p>
         </form>
       </div>

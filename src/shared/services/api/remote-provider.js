@@ -1,5 +1,10 @@
 import {
   API_CONTRACT,
+  parseAdminDeleteResponse,
+  parseAdminOverviewResponse,
+  parseAdminProblemMutationResponse,
+  parseAdminProblemsResponse,
+  parseAdminUsersResponse,
   parseAuthResponse,
   parseHealthResponse,
   parseLeaderboardResponse,
@@ -290,6 +295,63 @@ export const remoteApi = {
       });
 
       return parseProfileSubmissionsResponse(payload);
+    },
+  },
+
+  admin: {
+    async overview() {
+      const { payload } = await request(API_CONTRACT.adminOverview, {
+        requireAuth: true,
+      });
+      return parseAdminOverviewResponse(payload);
+    },
+
+    async users() {
+      const { payload } = await request(API_CONTRACT.adminUsers, {
+        requireAuth: true,
+      });
+      return parseAdminUsersResponse(payload);
+    },
+
+    async deleteUser(userId) {
+      const { payload } = await request(API_CONTRACT.adminDeleteUser, {
+        requireAuth: true,
+        params: { id: userId },
+      });
+      return parseAdminDeleteResponse(payload);
+    },
+
+    async problems(params = {}) {
+      const { payload } = await request(API_CONTRACT.adminProblems, {
+        requireAuth: true,
+        query: params,
+      });
+      return parseAdminProblemsResponse(payload);
+    },
+
+    async generateProblem(data) {
+      const { payload } = await request(API_CONTRACT.adminGenerateProblem, {
+        requireAuth: true,
+        body: data,
+      });
+      return parseAdminProblemMutationResponse(payload);
+    },
+
+    async updateProblem(problemId, data) {
+      const { payload } = await request(API_CONTRACT.adminUpdateProblem, {
+        requireAuth: true,
+        params: { id: problemId },
+        body: data,
+      });
+      return parseAdminProblemMutationResponse(payload);
+    },
+
+    async deleteProblem(problemId) {
+      const { payload } = await request(API_CONTRACT.adminDeleteProblem, {
+        requireAuth: true,
+        params: { id: problemId },
+      });
+      return parseAdminDeleteResponse(payload);
     },
   },
 };

@@ -26,6 +26,7 @@ function sanitizeUser(rawUser) {
     id,
     username,
     email,
+    role: rawUser.role === "admin" ? "admin" : "user",
     display_name:
       typeof rawUser.display_name === "string" && rawUser.display_name.trim().length > 0
         ? rawUser.display_name
