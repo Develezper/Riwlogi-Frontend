@@ -1,161 +1,66 @@
-import { localApi } from "./local-provider.js";
-import { ApiHttpError, remoteApi } from "./remote-provider.js";
-
-const MODE_LOCAL = "local";
-const MODE_REMOTE = "remote";
-const MODE_HYBRID = "hybrid";
-const VALID_MODES = new Set([MODE_LOCAL, MODE_REMOTE, MODE_HYBRID]);
-
-const configuredMode = String(import.meta.env.VITE_API_MODE || MODE_HYBRID).toLowerCase();
-const runtimeMode = VALID_MODES.has(configuredMode) ? configuredMode : MODE_HYBRID;
+import { remoteApi } from "./remote-provider.js";
 
 const runtime = {
-  configuredMode: runtimeMode,
-  activeProvider: MODE_LOCAL,
   backendAvailable: false,
   bootstrappedAt: null,
   lastError: null,
 };
 
-let provider = localApi;
-
-async function selectProvider() {
-  localApi.bootstrap();
-
-  if (runtimeMode === MODE_LOCAL) {
-    provider = localApi;
-    runtime.activeProvider = MODE_LOCAL;
-    runtime.backendAvailable = false;
-    runtime.lastError = null;
-    runtime.bootstrappedAt = new Date().toISOString();
-    return;
-  }
-
-  try {
-    await remoteApi.healthCheck();
-    provider = remoteApi;
-    runtime.activeProvider = MODE_REMOTE;
-    runtime.backendAvailable = true;
-    runtime.lastError = null;
-    runtime.bootstrappedAt = new Date().toISOString();
-  } catch (error) {
-    const detail =
-      error instanceof ApiHttpError
-        ? `Backend respondió ${error.status}: ${error.message}`
-        : error instanceof Error
-        ? error.message
-        : String(error);
-
-    runtime.lastError = detail;
-    runtime.bootstrappedAt = new Date().toISOString();
-
-    if (runtimeMode === MODE_REMOTE) {
-      throw new Error(`No se pudo inicializar la API remota. ${detail}`);
-    }
-
-    provider = localApi;
-    runtime.activeProvider = MODE_LOCAL;
-    runtime.backendAvailable = false;
-  }
-}
-
 export const api = {
   async bootstrap() {
-    await selectProvider();
+    try {
+      await remoteApi.healthCheck();
+      runtime.backendAvailable = true;
+      runtime.lastError = null;
+    } catch (error) {
+      runtime.lastError = error instanceof Error ? error.message : String(error);
+      runtime.backendAvailable = false;
+      throw error;
+    } finally {
+      runtime.bootstrappedAt = new Date().toISOString();
+    }
   },
 
   getRuntime() {
-    return {
-      ...runtime,
-      mode: runtime.activeProvider,
-    };
+    return { ...runtime };
   },
 
   auth: {
-    async login(payload) {
-      return provider.auth.login(payload);
-    },
-
-    async register(payload) {
-      return provider.auth.register(payload);
-    },
+    login: (payload) => remoteApi.auth.login(payload),
+    register: (payload) => remoteApi.auth.register(payload),
+    logout: () => remoteApi.auth.logout(),
   },
 
   problems: {
-    async list(params = {}) {
-      return provider.problems.list(params);
-    },
-
-    async get(slug) {
-      return provider.problems.get(slug);
-    },
-
-    async tags() {
-      return provider.problems.tags();
-    },
+    list: (params = {}) => remoteApi.problems.list(params),
+    get: (slug) => remoteApi.problems.get(slug),
+    tags: () => remoteApi.problems.tags(),
   },
 
   submissions: {
-    async start(problemId, language = "python") {
-      return provider.submissions.start(problemId, language);
-    },
-
-    async run(payload) {
-      return provider.submissions.run(payload);
-    },
-
-    async submit(submissionId) {
-      return provider.submissions.submit(submissionId);
-    },
-
-    async sendEvents(submissionId, events = []) {
-      return provider.submissions.sendEvents(submissionId, events);
-    },
+    start: (problemId, language = "python") => remoteApi.submissions.start(problemId, language),
+    run: (payload) => remoteApi.submissions.run(payload),
+    submit: (submissionId) => remoteApi.submissions.submit(submissionId),
+    sendEvents: (submissionId, events = []) =>
+      remoteApi.submissions.sendEvents(submissionId, events),
   },
 
   leaderboard: {
-    async get(params = {}) {
-      return provider.leaderboard.get(params);
-    },
+    get: (params = {}) => remoteApi.leaderboard.get(params),
   },
 
   profile: {
-    async me() {
-      return provider.profile.me();
-    },
-
-    async submissions() {
-      return provider.profile.submissions();
-    },
+    me: () => remoteApi.profile.me(),
+    submissions: () => remoteApi.profile.submissions(),
   },
 
   admin: {
-    async overview() {
-      return provider.admin.overview();
-    },
-
-    async users() {
-      return provider.admin.users();
-    },
-
-    async deleteUser(userId) {
-      return provider.admin.deleteUser(userId);
-    },
-
-    async problems(params = {}) {
-      return provider.admin.problems(params);
-    },
-
-    async generateProblem(payload) {
-      return provider.admin.generateProblem(payload);
-    },
-
-    async updateProblem(problemId, payload) {
-      return provider.admin.updateProblem(problemId, payload);
-    },
-
-    async deleteProblem(problemId) {
-      return provider.admin.deleteProblem(problemId);
-    },
+    overview: () => remoteApi.admin.overview(),
+    users: () => remoteApi.admin.users(),
+    deleteUser: (userId) => remoteApi.admin.deleteUser(userId),
+    problems: (params = {}) => remoteApi.admin.problems(params),
+    generateProblem: (payload) => remoteApi.admin.generateProblem(payload),
+    updateProblem: (problemId, payload) => remoteApi.admin.updateProblem(problemId, payload),
+    deleteProblem: (problemId) => remoteApi.admin.deleteProblem(problemId),
   },
 };
