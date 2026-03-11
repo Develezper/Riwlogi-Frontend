@@ -198,7 +198,7 @@ export const remoteApi = {
   auth: {
     async login({ email, password }) {
       const { payload } = await request(API_CONTRACT.authLogin, {
-        body: { email, password },
+        body: { identifier: email, password },
       });
       return parseAuthResponse(payload);
     },
@@ -208,6 +208,11 @@ export const remoteApi = {
         body: { username, email, password },
       });
       return parseAuthResponse(payload);
+    },
+
+    async logout() {
+      await request(API_CONTRACT.authLogout, { requireAuth: true });
+      return { ok: true };
     },
   },
 

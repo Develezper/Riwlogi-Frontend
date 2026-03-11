@@ -2,6 +2,7 @@ export const API_CONTRACT = Object.freeze({
   health: { method: "GET", path: "/health" },
   authLogin: { method: "POST", path: "/auth/login" },
   authRegister: { method: "POST", path: "/auth/register" },
+  authLogout: { method: "POST", path: "/auth/logout" },
   problemsList: { method: "GET", path: "/problems" },
   problemBySlug: { method: "GET", path: "/problems/:slug" },
   problemTags: { method: "GET", path: "/problems/tags" },
