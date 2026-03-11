@@ -90,12 +90,6 @@ export function renderNavbar() {
   const isAdmin = isAuth && user?.role === "admin";
   const links = isAdmin ? [...publicLinks, { path: "admin", label: "Admin" }] : publicLinks;
   const activePath = currentPath();
-  const runtime = api.getRuntime();
-  const modeLabel = runtime.activeProvider === "remote" ? "API conectada" : "Modo local";
-  const modeClass =
-    runtime.activeProvider === "remote"
-      ? "text-green-400 bg-green-500/10 border-green-500/30"
-      : "text-amber-300 bg-amber-500/10 border-amber-500/30";
 
   nav.className = "sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md";
 
@@ -114,9 +108,6 @@ export function renderNavbar() {
       </button>
 
       <div class="hidden md:flex items-center gap-1">
-        <span class="mr-2 px-2 py-0.5 rounded-full text-[11px] border ${modeClass}">
-          ${modeLabel}
-        </span>
         ${links
           .map(
             (link) => `
@@ -151,9 +142,6 @@ export function renderNavbar() {
 
     <div id="mobile-menu" class="md:hidden hidden border-t border-zinc-800 px-4 py-3 bg-zinc-950">
       <div class="flex flex-col gap-2">
-        <div class="px-3 py-1 rounded-md text-xs border ${modeClass}">
-          ${modeLabel}
-        </div>
         ${links
           .map(
             (link) => `
@@ -193,7 +181,12 @@ export function renderNavbar() {
   const logoutBtnMobile = nav.querySelector("#btn-logout-mobile");
   [logoutBtn, logoutBtnMobile].forEach((button) => {
     if (!button) return;
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
+      try {
+        await api.auth.logout();
+      } catch {
+        /* ignore logout errors */
+      }
       store.logout();
       router.navigate("");
     });
