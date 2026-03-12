@@ -29,11 +29,11 @@ test("solver can run and submit stages", async ({ page }) => {
   await login(page);
 
   await page.goto("/#/problem/two-sum");
-  await expect(page.getByText(/Visible tests/i)).toBeVisible();
+  await expect(page.getByText(/Casos de prueba/i)).toBeVisible();
 
-  await page.getByRole("button", { name: "Run" }).click();
-  await expect(page.locator("#results-panel")).toContainText(/Stage|Passed|Failed/i);
+  await page.getByRole("button", { name: "Ejecutar" }).click();
+  await expect(page.locator("#results-panel")).toContainText(/Salida por consola/i);
 
-  await page.getByRole("button", { name: "Submit" }).click();
-  await expect(page.locator("#toast-container")).toContainText(/Score final/i);
+  await page.getByRole("button", { name: "Enviar" }).click();
+  await expect(page.locator("#results-panel")).toContainText(/Validaciones de seguridad/i);
 });

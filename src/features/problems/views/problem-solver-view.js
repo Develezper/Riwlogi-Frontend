@@ -10,6 +10,8 @@ export async function problemSolverView(container, { slug }) {
     stages: [],
     activeStageIndex: 0,
     stageResults: {},
+    lastAction: null,
+    lastSecurityCheck: null,
     language: "python",
     submissionId: null,
     tracker: null,
@@ -171,8 +173,8 @@ function renderLayout(container, state) {
 
           <div class="h-[38%] border-t border-zinc-800 flex flex-col min-h-[200px]">
             <div class="px-3 pt-2 border-b border-zinc-800 bg-zinc-900/60 flex items-center justify-between gap-2">
-              <div class="flex items-center gap-2" role="tablist" aria-label="Panel de resultados y casos de prueba">
-                <button id="tab-results" role="tab" aria-selected="true" aria-controls="results-panel" data-panel="results" class="px-3 py-1.5 text-xs rounded-t-md bg-zinc-800 text-zinc-200">Resultados</button>
+              <div class="flex items-center gap-2" role="tablist" aria-label="Panel de consola y casos de prueba">
+                <button id="tab-results" role="tab" aria-selected="true" aria-controls="results-panel" data-panel="results" class="px-3 py-1.5 text-xs rounded-t-md bg-zinc-800 text-zinc-200">Consola</button>
                 <button id="tab-cases" role="tab" aria-selected="false" aria-controls="cases-panel" data-panel="cases" class="px-3 py-1.5 text-xs rounded-t-md text-zinc-500 hover:text-zinc-300">Casos de prueba</button>
               </div>
               <div class="flex items-center gap-2">
@@ -209,8 +211,9 @@ function bindEvents(container, state) {
     if (!activeStage) return;
 
     state.isRunning = true;
+    state.lastAction = "run";
     setButtonsDisabled(container, true, "run");
-    updateResultsPanel(container, state, null, true);
+    updateResultsPanel(container, state, { mode: "run" }, true);
     state.tracker?.onRun("run");
 
     try {
@@ -218,22 +221,32 @@ function bindEvents(container, state) {
       saveDraft(state.problem.id, state.language, code);
       const result = await runStage(state, activeStage.id, code);
 
+      const output = extractConsoleOutput(result);
       state.stageResults[activeStage.id] = {
-        passed: result.passed,
-        result,
+        output,
+        runtime_ms: Number(result.runtime_ms || 0),
+        stage_index: result.stage_index || activeStage.stage_index,
+        classification: result.classification || null,
       };
+      if (result.classification) {
+        state.lastSecurityCheck = result.classification;
+      }
 
       updateStageBar(container, state);
-      updateResultsPanel(container, state, result, false);
-
-      if (result.passed) {
-        showToast(`Etapa ${activeStage.stage_index} aprobada`, "success");
-      } else {
-        showToast(`Etapa ${activeStage.stage_index} fallida`, "error");
-      }
+      updateResultsPanel(
+        container,
+        state,
+        {
+          mode: "run",
+          output,
+          runtime_ms: Number(result.runtime_ms || 0),
+          stage_index: result.stage_index || activeStage.stage_index,
+        },
+        false,
+      );
     } catch (error) {
       showToast(error.message, "error");
-      updateResultsPanel(container, state, null, false);
+      updateResultsPanel(container, state, { mode: "run" }, false);
     } finally {
       state.isRunning = false;
       setButtonsDisabled(container, false);
@@ -244,48 +257,40 @@ function bindEvents(container, state) {
     if (state.isRunning) return;
 
     state.isRunning = true;
+    state.lastAction = "submit";
     setButtonsDisabled(container, true, "submit");
-    updateResultsPanel(container, state, null, true);
+    updateResultsPanel(container, state, { mode: "submit" }, true);
     state.tracker?.onRun("submit");
-
-    const selectedStage = state.activeStageIndex;
 
     try {
       const code = getCurrentCode(container, state);
       saveDraft(state.problem.id, state.language, code);
-      let latestResult = null;
+      const activeStage = getActiveStage(state);
+      let security = state.lastSecurityCheck;
 
-      for (let index = 0; index < state.stages.length; index += 1) {
-        const stage = state.stages[index];
-        state.tracker?.setStage(stage.id);
-        latestResult = await runStage(state, stage.id, code);
-
-        state.stageResults[stage.id] = {
-          passed: latestResult.passed,
-          result: latestResult,
+      if (activeStage) {
+        const runResult = await runStage(state, activeStage.id, code);
+        const output = extractConsoleOutput(runResult);
+        state.stageResults[activeStage.id] = {
+          output,
+          runtime_ms: Number(runResult.runtime_ms || 0),
+          stage_index: runResult.stage_index || activeStage.stage_index,
+          classification: runResult.classification || null,
         };
-
-        updateStageBar(container, state);
-
-        if (!latestResult.passed) break;
+        if (runResult.classification) {
+          security = runResult.classification;
+        }
       }
 
-      const final = await api.submissions.submit(state.submissionId);
+      await api.submissions.submit(state.submissionId);
 
-      state.activeStageIndex = selectedStage;
-      state.tracker?.setStage(getActiveStage(state)?.id);
-      updateStageContent(container, state);
-      updateResultsPanel(container, state, latestResult, false);
-
-      if (final.verdict === "accepted") {
-        clearDraft(state.problem.id, state.language);
-        showToast(`Aceptado. Puntaje final: ${final.final_score}`, "success", 5000);
-      } else {
-        showToast(`Envío incompleto. Puntaje final: ${final.final_score}`, "error", 5000);
-      }
+      state.lastSecurityCheck = security;
+      updateStageBar(container, state);
+      updateResultsPanel(container, state, { mode: "submit", security }, false);
+      showToast("Envío registrado. Revisa las validaciones de seguridad.", "success", 5000);
     } catch (error) {
       showToast(error.message, "error");
-      updateResultsPanel(container, state, null, false);
+      updateResultsPanel(container, state, { mode: "submit", security: state.lastSecurityCheck }, false);
     } finally {
       state.isRunning = false;
       setButtonsDisabled(container, false);
@@ -307,6 +312,8 @@ function bindEvents(container, state) {
 
     state.language = event.target.value;
     state.stageResults = {};
+    state.lastAction = null;
+    state.lastSecurityCheck = null;
 
     try {
       await startSubmission(state);
@@ -489,6 +496,34 @@ async function runStage(state, stageId, code) {
   });
 }
 
+function extractConsoleOutput(result) {
+  if (!result || typeof result !== "object") return "";
+
+  const pickText = (value) => {
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) {
+      return value.filter((item) => typeof item === "string").join("\n");
+    }
+    return "";
+  };
+
+  const stdout = pickText(result.stdout);
+  const stderr = pickText(result.stderr);
+  if (stdout || stderr) {
+    return [stdout, stderr].filter(Boolean).join(stdout && stderr ? "\n" : "");
+  }
+
+  return (
+    pickText(result.output) ||
+    pickText(result.output_text) ||
+    pickText(result.outputText) ||
+    pickText(result.console_output) ||
+    pickText(result.console_text) ||
+    pickText(result.consoleText) ||
+    pickText(result.console)
+  );
+}
+
 function getCurrentCode(container, state) {
   if (state.editorView) {
     return state.editorView.state.doc.toString();
@@ -541,18 +576,41 @@ function updateStageContent(container, state) {
   }
 }
 
-function updateResultsPanel(container, state, explicitResult = null, isRunning = false) {
+function buildRunView(state, stage) {
+  if (!stage) return null;
+  const stored = state.stageResults[stage.id];
+  if (!stored) return null;
+
+  return {
+    mode: "run",
+    output: stored.output,
+    runtime_ms: stored.runtime_ms,
+    stage_index: stored.stage_index || stage.stage_index,
+  };
+}
+
+function buildSubmitView(state) {
+  return {
+    mode: "submit",
+    security: state.lastSecurityCheck || null,
+  };
+}
+
+function updateResultsPanel(container, state, explicitView = null, isRunning = false) {
   const panel = container.querySelector("#results-panel");
   if (!panel) return;
 
-  if (isRunning) {
-    panel.innerHTML = scorePanel(null, true);
-    return;
+  let view = explicitView;
+
+  if (!view) {
+    if (state.lastAction === "submit") {
+      view = buildSubmitView(state);
+    } else {
+      view = buildRunView(state, getActiveStage(state));
+    }
   }
 
-  const stage = getActiveStage(state);
-  const stageResult = stage ? state.stageResults[stage.id]?.result : null;
-  panel.innerHTML = scorePanel(explicitResult || stageResult || null, false);
+  panel.innerHTML = scorePanel(view, isRunning);
 }
 
 function updateCasesPanel(container, state) {

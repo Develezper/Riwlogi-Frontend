@@ -16,14 +16,14 @@ export function stageBar(stages, currentStage = 0, stageResults = {}, minStages 
       extraClass = "opacity-50 cursor-not-allowed";
     }
 
-    if (result) {
+    if (result && typeof result.passed === "boolean") {
       stateClass = result.passed ? "passed" : "failed";
       icon = result.passed ? "✓" : "✕";
     }
 
     const isActive = hasStage && stageIndex === currentStage ? "active" : "";
     const connectorClass =
-      index < totalStages - 1 && result?.passed ? "bg-green-500/60" : "bg-zinc-700";
+      index < totalStages - 1 && result?.passed === true ? "bg-green-500/60" : "bg-zinc-700";
 
     return `
       <div class="flex items-center gap-1.5">
