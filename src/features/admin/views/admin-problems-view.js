@@ -88,7 +88,6 @@ function renderView(container, state) {
                       }" data-action="select-problem" data-problem-id="${escapeHtml(p.id)}">
                         <td class="py-3 pr-3">
                           <p class="text-zinc-100 font-medium">${escapeHtml(p.title)}</p>
-                          <p class="text-xs text-zinc-500">${escapeHtml(p.slug)}</p>
                         </td>
                         <td class="py-3 pr-3">${sourceBadge(p.source)}</td>
                         <td class="py-3 pr-3">${statusBadge(p.status)}</td>

@@ -23,16 +23,12 @@ function buildEditFormHtml(problem) {
   return `
     <form id="edit-problem-form" class="space-y-4" novalidate>
       <input type="hidden" name="problem_id" value="${escapeHtml(problem.id || "")}" />
+      <input type="hidden" name="slug" value="${slug}" />
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 gap-4">
         <div>
           <label class="block text-xs text-zinc-400 mb-1">Título</label>
           <input name="title" required value="${title}"
-            class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
-        </div>
-        <div>
-          <label class="block text-xs text-zinc-400 mb-1">Slug</label>
-          <input name="slug" value="${slug}"
             class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
         </div>
       </div>
@@ -135,7 +131,7 @@ function renderView(container, state) {
       <div class="flex items-start gap-4">
         <div class="flex-1">
           <h1 class="text-2xl font-bold text-zinc-100">Editar ejercicio</h1>
-          <p class="text-zinc-400 text-sm mt-1">${escapeHtml(state.problem?.title || "")} · <span class="font-mono">${escapeHtml(state.problem?.slug || "")}</span></p>
+          <p class="text-zinc-400 text-sm mt-1">${escapeHtml(state.problem?.title || "")}</p>
         </div>
         ${sourceBadgeHtml}
       </div>
@@ -201,7 +197,7 @@ export async function adminEditProblemView(container, params = {}) {
 
       const payload = {
         title: String(formData.get("title") || "").trim(),
-        slug: String(formData.get("slug") || "").trim(),
+        slug: state.problem?.slug || String(formData.get("slug") || "").trim(),
         difficulty: Number(formData.get("difficulty") || 1),
         tags: parseCsv(formData.get("tags")),
         status: formData.get("status"),

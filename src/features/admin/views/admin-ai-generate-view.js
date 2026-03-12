@@ -23,16 +23,12 @@ function buildEditFormHtml(problem) {
   return `
     <form id="edit-problem-form" class="space-y-4" novalidate>
       <input type="hidden" name="problem_id" value="${escapeHtml(problem.id || "")}" />
+      <input type="hidden" name="slug" value="${slug}" />
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 gap-4">
         <div>
           <label class="block text-xs text-zinc-400 mb-1">Título</label>
           <input name="title" required value="${title}"
-            class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
-        </div>
-        <div>
-          <label class="block text-xs text-zinc-400 mb-1">Slug</label>
-          <input name="slug" value="${slug}"
             class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
         </div>
       </div>
@@ -130,7 +126,7 @@ function renderPromptPhase(container, state) {
             placeholder="Ejemplo: Crea un ejercicio de dificultad media sobre búsqueda binaria en un arreglo ordenado. La función recibe un arreglo de enteros y un target, y devuelve el índice si existe o -1 si no. Incluye 3 etapas progresivas con casos de prueba variados."
           >${escapeHtml(state.lastPrompt || "")}</textarea>
           <p class="mt-2 text-xs text-zinc-500">
-            La IA genera todos los campos: título, slug, dificultad, etiquetas, enunciado (Markdown), código inicial en Python y JavaScript, etapas y pruebas.
+            La IA genera todos los campos: título, dificultad, etiquetas, enunciado (Markdown), código inicial en Python y JavaScript, etapas y pruebas.
           </p>
           <div class="flex justify-end mt-4">
             <button type="submit"
@@ -241,7 +237,7 @@ export async function adminAiGenerateView(container) {
 
         const payload = {
           title: String(formData.get("title") || "").trim(),
-          slug: String(formData.get("slug") || "").trim(),
+          slug: state.generatedProblem?.slug || String(formData.get("slug") || "").trim(),
           difficulty: Number(formData.get("difficulty") || 1),
           tags: parseCsv(formData.get("tags")),
           status: formData.get("status"),
