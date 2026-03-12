@@ -21,6 +21,10 @@
   outline-offset: 2px;
 }
 
+#main:focus-visible {
+  outline: none;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
