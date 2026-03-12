@@ -5,6 +5,10 @@ import { profileView } from "../features/profile/views/profile-view.js";
 import { loginView } from "../features/auth/views/login-view.js";
 import { registerView } from "../features/auth/views/register-view.js";
 import { adminView } from "../features/admin/views/admin-view.js";
+import { adminProblemsView } from "../features/admin/views/admin-problems-view.js";
+import { adminUsersView } from "../features/admin/views/admin-users-view.js";
+import { adminAiGenerateView } from "../features/admin/views/admin-ai-generate-view.js";
+import { adminEditProblemView } from "../features/admin/views/admin-edit-problem-view.js";
 import { store } from "../shared/state/session-store.js";
 
 const routes = [
@@ -13,7 +17,11 @@ const routes = [
   { path: "problem/:slug", view: problemSolverView, auth: true },
   { path: "leaderboard", view: leaderboardView },
   { path: "profile", view: profileView, auth: true },
-  { path: "admin", view: adminView, auth: true },
+  { path: "admin", view: adminView, auth: true, admin: true },
+  { path: "admin/problems", view: adminProblemsView, auth: true, admin: true },
+  { path: "admin/problems/edit/:id", view: adminEditProblemView, auth: true, admin: true },
+  { path: "admin/generate", view: adminAiGenerateView, auth: true, admin: true },
+  { path: "admin/users", view: adminUsersView, auth: true, admin: true },
   { path: "login", view: loginView },
   { path: "register", view: registerView },
 ];
@@ -81,6 +89,11 @@ export const router = {
 
     if (matchedRoute.auth && !store.isAuthenticated()) {
       this.navigate("login");
+      return;
+    }
+
+    if (matchedRoute.admin && store.getUser()?.role !== "admin") {
+      this.navigate("");
       return;
     }
 
