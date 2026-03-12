@@ -1,5 +1,4 @@
 import { api } from "../../../shared/services/api/index.js";
-import { store } from "../../../shared/state/session-store.js";
 import { spinner } from "../../../shared/utils/ui-helpers.js";
 
 const verdictConfig = {
@@ -14,22 +13,7 @@ function formatDate(value) {
   return date.toLocaleDateString("es-CO", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
 export async function profileView(container) {
-  const currentUser = store.getUser();
-  if (currentUser?.role === "admin") {
-    renderAdminProfile(container, currentUser);
-    return;
-  }
-
   container.innerHTML = spinner("lg");
 
   try {
@@ -45,36 +29,6 @@ export async function profileView(container) {
       </div>
     `;
   }
-}
-
-function renderAdminProfile(container, user) {
-  const displayName = user.display_name || user.username || "Administrador";
-  const initial = (displayName || "?")[0].toUpperCase();
-
-  container.innerHTML = `
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-10">
-      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6">
-        <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div class="w-16 h-16 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-2xl font-bold text-brand">
-            ${escapeHtml(initial)}
-          </div>
-          <div class="flex-1">
-            <h1 class="text-2xl font-bold text-zinc-100">${escapeHtml(displayName)}</h1>
-            <p class="text-sm text-zinc-400">${escapeHtml(user.email || "")}</p>
-            <p class="text-xs text-zinc-500 mt-1">Rol: Administrador</p>
-          </div>
-          <a href="#/admin" class="px-4 py-2 rounded-lg bg-brand text-white hover:bg-brand-dark transition text-sm">
-            Ir al panel de administración
-          </a>
-        </div>
-
-        <div class="mt-6 rounded-lg border border-zinc-800 bg-zinc-950/40 p-4 text-sm text-zinc-400">
-          Este perfil de progreso está disponible solo para usuarios que resuelven ejercicios.
-          Los administradores no registran envíos.
-        </div>
-      </div>
-    </div>
-  `;
 }
 
 function renderProfile(container, profile, submissions) {

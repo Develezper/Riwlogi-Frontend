@@ -16,7 +16,7 @@ const routes = [
   { path: "problems", view: problemsHomeView },
   { path: "problem/:slug", view: problemSolverView, auth: true },
   { path: "leaderboard", view: leaderboardView },
-  { path: "profile", view: profileView, auth: true },
+  { path: "profile", view: profileView, auth: true, noAdmin: true },
   { path: "admin", view: adminView, auth: true, admin: true },
   { path: "admin/problems", view: adminProblemsView, auth: true, admin: true },
   { path: "admin/problems/edit/:id", view: adminEditProblemView, auth: true, admin: true },
@@ -92,7 +92,14 @@ export const router = {
       return;
     }
 
-    if (matchedRoute.admin && store.getUser()?.role !== "admin") {
+    const role = store.getUser()?.role;
+
+    if (matchedRoute.noAdmin && role === "admin") {
+      this.navigate("admin");
+      return;
+    }
+
+    if (matchedRoute.admin && role !== "admin") {
       this.navigate("");
       return;
     }
