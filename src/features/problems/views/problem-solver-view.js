@@ -2,7 +2,7 @@ import { stageBar } from "../components/stage-bar.js";
 import { scorePanel } from "../components/score-panel.js";
 import { api } from "../../../shared/services/api/index.js";
 import { EditorTracker } from "../services/editor-tracker.js";
-import { difficultyBadge, renderMarkdown, showToast, spinner } from "../../../shared/utils/ui-helpers.js";
+import { difficultyBadge, escapeHtml, renderMarkdown, showToast, spinner } from "../../../shared/utils/ui-helpers.js";
 
 export async function problemSolverView(container, { slug }) {
   const state = {
@@ -18,6 +18,8 @@ export async function problemSolverView(container, { slug }) {
     draftSaveTimer: null,
     isRunning: false,
     activePanel: "results",
+    statementParts: { body: "", constraints: "" },
+    examples: [],
     cleanupFns: [],
   };
 
@@ -63,6 +65,8 @@ export async function problemSolverView(container, { slug }) {
     state.problem = problem;
     state.stages = Array.isArray(problem.stages) ? problem.stages : [];
     state.language = Object.keys(problem.starter_code || problem.starterCode || { python: "" })[0] || "python";
+    state.statementParts = splitStatementAndConstraints(problem.statement_md || "");
+    state.examples = collectExampleTests(state.stages, 3);
 
     renderLayout(container, state);
 
@@ -96,29 +100,46 @@ export async function problemSolverView(container, { slug }) {
 
 function renderLayout(container, state) {
   const badge = difficultyBadge(state.problem.difficulty);
-  const statementHtml = renderMarkdown(state.problem.statement_md || "");
+  const statementHtml = renderMarkdown(getStatementMarkdown(state));
+  const tagsHtml = renderTags(state.problem.tags || []);
+  const examplesHtml = renderExamples(state.examples);
+  const constraintsHtml = renderConstraintsSection(state.statementParts?.constraints);
   const languageOptions = Object.keys(state.problem.starter_code || state.problem.starterCode || {});
 
   container.innerHTML = `
     <div class="h-[calc(100vh-3.5rem)] flex flex-col">
-      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 px-4 py-2 border-b border-zinc-800 bg-zinc-900/50">
-        <div class="flex items-center gap-3">
+      <div class="px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
           <a href="#/problems" class="text-zinc-500 hover:text-white transition" aria-label="Volver a problemas">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
           </a>
           <h1 class="font-semibold text-white">${state.problem.title}</h1>
           <span class="px-2 py-0.5 rounded-full text-xs font-medium ${badge.class}">${badge.label}</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-xs uppercase tracking-wide text-zinc-500">Etapas</span>
+            <div id="stage-bar-container" class="max-w-full"></div>
+          </div>
         </div>
-        <div id="stage-bar-container" class="max-w-full"></div>
       </div>
 
       <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
         <section class="w-full lg:w-[42%] lg:border-r border-zinc-800 overflow-y-auto max-h-[38vh] lg:max-h-none">
-          <div class="p-6">
-            <div class="prose-content mb-6">${statementHtml}</div>
+          <div class="p-6 space-y-6">
+            ${tagsHtml ? `<div class="flex flex-wrap items-center gap-2">${tagsHtml}</div>` : ""}
 
-            <div id="stage-prompt" class="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 mb-4"></div>
-            <div id="visible-tests"></div>
+            <div>
+              <h2 class="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-2">Enunciado</h2>
+              <div id="problem-statement" class="prose-content">${statementHtml}</div>
+            </div>
+
+            <div>
+              <h2 class="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-2">Ejemplos</h2>
+              <div id="problem-examples" class="space-y-3">${examplesHtml}</div>
+            </div>
+
+            <div id="problem-constraints">${constraintsHtml}</div>
           </div>
         </section>
 
@@ -135,16 +156,12 @@ function renderLayout(container, state) {
                   )
                   .join("")}
               </select>
-              <button id="btn-reset" class="px-3 py-1.5 rounded-md text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition" title="Reiniciar código">
+              <button id="btn-reset" class="px-3 py-1.5 rounded-md text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition inline-flex items-center gap-2" title="Reiniciar código">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 9a7 7 0 0 0-14-2M4 15a7 7 0 0 0 14 2"/>
+                </svg>
                 Reiniciar
-              </button>
-            </div>
-            <div class="flex items-center gap-2">
-              <button id="btn-run" class="px-4 py-1.5 rounded-md text-sm bg-zinc-700 text-white hover:bg-zinc-600 transition font-medium">
-                Ejecutar
-              </button>
-              <button id="btn-submit" class="px-4 py-1.5 rounded-md text-sm bg-brand text-white hover:bg-brand-dark transition font-medium">
-                Enviar
               </button>
             </div>
           </div>
@@ -152,9 +169,19 @@ function renderLayout(container, state) {
           <div id="code-editor" class="flex-1 overflow-hidden bg-zinc-950"></div>
 
           <div class="h-[38%] border-t border-zinc-800 flex flex-col min-h-[200px]">
-            <div class="px-3 pt-2 border-b border-zinc-800 bg-zinc-900/60 flex items-center gap-2" role="tablist" aria-label="Panel de resultados y casos de prueba">
-              <button id="tab-results" role="tab" aria-selected="true" aria-controls="results-panel" data-panel="results" class="px-3 py-1.5 text-xs rounded-t-md bg-zinc-800 text-zinc-200">Resultados</button>
-              <button id="tab-cases" role="tab" aria-selected="false" aria-controls="cases-panel" data-panel="cases" class="px-3 py-1.5 text-xs rounded-t-md text-zinc-500 hover:text-zinc-300">Casos de prueba</button>
+            <div class="px-3 pt-2 border-b border-zinc-800 bg-zinc-900/60 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2" role="tablist" aria-label="Panel de resultados y casos de prueba">
+                <button id="tab-results" role="tab" aria-selected="true" aria-controls="results-panel" data-panel="results" class="px-3 py-1.5 text-xs rounded-t-md bg-zinc-800 text-zinc-200">Resultados</button>
+                <button id="tab-cases" role="tab" aria-selected="false" aria-controls="cases-panel" data-panel="cases" class="px-3 py-1.5 text-xs rounded-t-md text-zinc-500 hover:text-zinc-300">Casos de prueba</button>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="btn-run" class="px-3 py-1.5 rounded-md text-xs bg-zinc-700 text-white hover:bg-zinc-600 transition font-medium">
+                  Ejecutar
+                </button>
+                <button id="btn-submit" class="px-3 py-1.5 rounded-md text-xs bg-brand text-white hover:bg-brand-dark transition font-medium">
+                  Enviar
+                </button>
+              </div>
             </div>
 
             <div id="results-panel" role="tabpanel" aria-live="polite" class="flex-1 overflow-y-auto p-3"></div>
@@ -298,6 +325,7 @@ function bindEvents(container, state) {
   const onStageClick = (event) => {
     const stageButton = event.target.closest("[data-stage-index]");
     if (!stageButton) return;
+    if (stageButton.dataset.stageActive !== "true") return;
 
     const stageIndex = Number(stageButton.dataset.stageIndex) - 1;
     if (stageIndex < 0 || stageIndex >= state.stages.length) return;
@@ -309,6 +337,7 @@ function bindEvents(container, state) {
     updateStageBar(container, state);
     updateStageContent(container, state);
     updateResultsPanel(container, state);
+    updateCasesPanel(container, state);
   };
 
   const onTabClick = (event) => {
@@ -490,25 +519,24 @@ function replaceEditorCode(container, state, code) {
 function updateStageBar(container, state) {
   const stageContainer = container.querySelector("#stage-bar-container");
   if (!stageContainer) return;
-  stageContainer.innerHTML = stageBar(state.stages, state.activeStageIndex + 1, state.stageResults);
+  stageContainer.innerHTML = stageBar(state.stages, state.activeStageIndex + 1, state.stageResults, 3);
 }
 
 function updateStageContent(container, state) {
-  const stage = getActiveStage(state);
-  if (!stage) return;
+  const statement = container.querySelector("#problem-statement");
+  const examples = container.querySelector("#problem-examples");
+  const constraints = container.querySelector("#problem-constraints");
 
-  const prompt = container.querySelector("#stage-prompt");
-  const tests = container.querySelector("#visible-tests");
-
-  if (prompt) {
-    prompt.innerHTML = `
-      <h4 class="text-sm font-semibold text-brand mb-2">Etapa ${stage.stage_index}</h4>
-      <div class="prose-content text-sm">${renderMarkdown(stage.prompt_md || "")}</div>
-    `;
+  if (statement) {
+    statement.innerHTML = renderMarkdown(getStatementMarkdown(state));
   }
 
-  if (tests) {
-    tests.innerHTML = renderVisibleTests(stage);
+  if (examples) {
+    examples.innerHTML = renderExamples(state.examples);
+  }
+
+  if (constraints) {
+    constraints.innerHTML = renderConstraintsSection(state.statementParts?.constraints);
   }
 }
 
@@ -530,25 +558,21 @@ function updateCasesPanel(container, state) {
   const panel = container.querySelector("#cases-panel");
   if (!panel) return;
 
-  panel.innerHTML = state.stages
+  const stage = getActiveStage(state);
+  const tests = stage?.visible_tests || [];
+
+  if (!tests.length) {
+    panel.innerHTML = `<p class="text-sm text-zinc-500">No hay casos de prueba visibles para esta etapa.</p>`;
+    return;
+  }
+
+  panel.innerHTML = tests
     .map(
-      (stage) => `
-      <div class="mb-4 p-3 rounded-lg border border-zinc-800 bg-zinc-900/50">
-        <h4 class="text-sm font-semibold text-zinc-200 mb-2">Etapa ${stage.stage_index}</h4>
-
-        ${(stage.visible_tests || [])
-          .map(
-            (test, index) => `
-          <div class="mb-2 rounded-md border border-zinc-700 bg-zinc-800/40 p-3 text-xs font-mono">
-            <p class="text-zinc-400">Entrada: <span class="text-zinc-200">${test.input_text}</span></p>
-            <p class="text-zinc-400">Esperado: <span class="text-green-400">${test.expected_text}</span></p>
-            <p class="text-zinc-500 mt-1">Prueba visible ${index + 1}</p>
-          </div>
-        `,
-          )
-          .join("")}
-
-        <p class="text-xs text-zinc-500">+ ${stage.hidden_count || 0} pruebas ocultas</p>
+      (test, index) => `
+      <div class="mb-3 rounded-md border border-zinc-800 bg-zinc-900/50 p-3 text-xs font-mono">
+        <p class="text-zinc-400">Entrada: <span class="text-zinc-200">${escapeHtml(test.input_text)}</span></p>
+        <p class="text-zinc-400">Esperado: <span class="text-green-400">${escapeHtml(test.expected_text)}</span></p>
+        <p class="text-zinc-500 mt-1">Caso ${index + 1}</p>
       </div>
     `,
     )
@@ -662,26 +686,109 @@ function languageLabel(language) {
   return language.charAt(0).toUpperCase() + language.slice(1);
 }
 
-function renderVisibleTests(stage) {
-  if (!stage || !stage.visible_tests?.length) {
-    return `<p class="text-sm text-zinc-500">No hay pruebas visibles para esta etapa.</p>`;
+function renderTags(tags) {
+  if (!Array.isArray(tags) || !tags.length) return "";
+  return tags
+    .map(
+      (tag) => `
+      <span class="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-300 border border-zinc-700">
+        ${escapeHtml(tag)}
+      </span>
+    `,
+    )
+    .join("");
+}
+
+function collectExampleTests(stages, limit = 3) {
+  const examples = [];
+  for (const stage of stages || []) {
+    for (const test of stage.visible_tests || []) {
+      examples.push(test);
+      if (examples.length >= limit) return examples;
+    }
+  }
+  return examples;
+}
+
+function renderExamples(examples) {
+  if (!examples?.length) {
+    return `<p class="text-sm text-zinc-500">No hay ejemplos disponibles todavía.</p>`;
   }
 
-  return `
-    <h4 class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">Pruebas visibles</h4>
-    ${stage.visible_tests
-      .map(
-        (test, index) => `
-      <div class="mb-3 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
-        <p class="text-xs font-semibold text-zinc-400 mb-1">Prueba ${index + 1}</p>
-        <div class="text-xs font-mono">
-          <p class="text-zinc-500">Entrada: <span class="text-zinc-300">${test.input_text}</span></p>
-          <p class="text-zinc-500">Esperado: <span class="text-green-400">${test.expected_text}</span></p>
+  return examples
+    .map(
+      (example, index) => `
+      <div class="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+        <p class="text-xs font-semibold text-zinc-400 mb-2">Ejemplo ${index + 1}</p>
+        <div class="text-xs font-mono space-y-1">
+          <p class="text-zinc-400">Entrada: <span class="text-zinc-200">${escapeHtml(example.input_text)}</span></p>
+          <p class="text-zinc-400">Salida: <span class="text-green-400">${escapeHtml(example.expected_text)}</span></p>
         </div>
       </div>
     `,
-      )
-      .join("")}
-    <p class="text-xs text-zinc-500">+ ${stage.hidden_count || 0} pruebas ocultas</p>
+    )
+    .join("");
+}
+
+function getStatementMarkdown(state) {
+  const statementBody = state.statementParts?.body?.trim?.() || "";
+  if (statementBody) return statementBody;
+  const stagePrompt = getActiveStage(state)?.prompt_md || "";
+  return stagePrompt;
+}
+
+function splitStatementAndConstraints(md) {
+  const text = String(md || "").replace(/\r\n/g, "\n").trim();
+  if (!text) return { body: "", constraints: "" };
+
+  const lines = text.split("\n");
+  const headingRegex = /^(#{2,3})\s*(Restricciones|Constraints)\b[:\-]*\s*(.*)$/i;
+  let startIndex = -1;
+  let level = 0;
+  let inline = "";
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const match = lines[i].match(headingRegex);
+    if (match) {
+      startIndex = i;
+      level = match[1].length;
+      inline = match[3] || "";
+      break;
+    }
+  }
+
+  if (startIndex === -1) {
+    return { body: text, constraints: "" };
+  }
+
+  let endIndex = lines.length;
+  for (let j = startIndex + 1; j < lines.length; j += 1) {
+    const headingMatch = lines[j].match(/^(#{1,6})\s+/);
+    if (headingMatch && headingMatch[1].length <= level) {
+      endIndex = j;
+      break;
+    }
+  }
+
+  const constraintLines = [];
+  if (inline.trim()) constraintLines.push(inline.trim());
+  constraintLines.push(...lines.slice(startIndex + 1, endIndex));
+
+  const constraints = constraintLines.join("\n").trim();
+  const bodyLines = [...lines.slice(0, startIndex), ...lines.slice(endIndex)];
+  const body = bodyLines.join("\n").trim();
+
+  return { body, constraints };
+}
+
+function renderConstraintsSection(constraintsMd) {
+  if (!constraintsMd) return "";
+  const constraintsHtml = renderMarkdown(constraintsMd);
+  if (!constraintsHtml) return "";
+  return `
+    <div>
+      <h2 class="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-2">Restricciones</h2>
+      <div class="prose-content text-sm">${constraintsHtml}</div>
+    </div>
   `;
 }

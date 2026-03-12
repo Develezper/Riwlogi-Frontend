@@ -26,7 +26,7 @@ export function adminNav(active) {
             )
             .join("")}
         </nav>
-        <span class="text-xs text-zinc-500 shrink-0">${escapeHtml(user?.display_name || "Admin")}</span>
+        <span class="text-xs text-zinc-500 shrink-0">${escapeHtml(user?.display_name || "Administrador")}</span>
       </div>
     </div>
   `;
