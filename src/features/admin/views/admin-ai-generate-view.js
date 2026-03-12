@@ -160,6 +160,15 @@ function renderEditPhase(container, state) {
         </span>
       </div>
 
+      ${
+        state.savedProblemId
+          ? `<div class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+              Ejercicio guardado. Puedes seguir editando o
+              <a href="#/admin/problems/edit/${escapeHtml(state.savedProblemId)}" class="underline text-emerald-100 hover:text-white">abrirlo en el catálogo</a>.
+            </div>`
+          : ""
+      }
+
       ${state.error ? `<div class="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">${escapeHtml(state.error)}</div>` : ""}
 
       <div class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
@@ -175,6 +184,7 @@ export async function adminAiGenerateView(container) {
     error: null,
     lastPrompt: "",
     generatedProblem: null,
+    savedProblemId: null,
   };
 
   let isMounted = true;
@@ -207,6 +217,7 @@ export async function adminAiGenerateView(container) {
         if (!isMounted) return;
         state.generatedProblem = created;
         state.phase = "edit";
+        state.savedProblemId = null;
         render();
         showToast("Ejercicio generado. Revisa los datos y guarda.", "success");
       } catch (error) {
@@ -240,14 +251,18 @@ export async function adminAiGenerateView(container) {
             javascript: String(formData.get("starter_javascript") || "").trimEnd(),
           },
           stages_json: formData.get("stages_json"),
+          source: "ai",
         };
 
-        await api.admin.updateProblem(problemId, payload);
+        const lastPrompt = state.lastPrompt || state.generatedProblem?.last_generated_prompt || "";
+        if (lastPrompt) payload.last_generated_prompt = lastPrompt;
+
+        const updated = await api.admin.updateProblem(problemId, payload);
         if (!isMounted) return;
-        showToast("Ejercicio guardado correctamente.", "success");
-        state.phase = "prompt";
-        state.generatedProblem = null;
-        state.lastPrompt = "";
+        state.generatedProblem = updated;
+        state.savedProblemId = updated?.id || problemId;
+        showToast("Ejercicio guardado. Puedes seguir editando.", "success");
+        state.phase = "edit";
         render();
       } catch (error) {
         if (!isMounted) return;
@@ -265,6 +280,8 @@ export async function adminAiGenerateView(container) {
     if (trigger.dataset.action === "back-to-prompt") {
       state.phase = "prompt";
       state.error = null;
+      state.generatedProblem = null;
+      state.savedProblemId = null;
       render();
     }
   };

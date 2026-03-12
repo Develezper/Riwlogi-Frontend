@@ -213,6 +213,13 @@ export async function adminEditProblemView(container, params = {}) {
         stages_json: formData.get("stages_json"),
       };
 
+      if (state.problem?.source === "ai" || state.problem?.ai_generated) {
+        payload.source = "ai";
+        if (state.problem?.last_generated_prompt) {
+          payload.last_generated_prompt = state.problem.last_generated_prompt;
+        }
+      }
+
       const updated = await api.admin.updateProblem(pid, payload);
       if (!isMounted) return;
       state.problem = updated;
