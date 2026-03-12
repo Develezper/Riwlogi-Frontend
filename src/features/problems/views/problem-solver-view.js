@@ -65,7 +65,8 @@ export async function problemSolverView(container, { slug }) {
     state.problem = problem;
     state.stages = Array.isArray(problem.stages) ? problem.stages : [];
     state.language = Object.keys(problem.starter_code || problem.starterCode || { python: "" })[0] || "python";
-    state.statementParts = splitStatementAndConstraints(problem.statement_md || "");
+    const localizedStatement = localizeStatementMarkdown(problem.statement_md || "");
+    state.statementParts = splitStatementAndConstraints(localizedStatement);
     state.examples = collectExampleTests(state.stages, 3);
 
     renderLayout(container, state);
@@ -734,7 +735,7 @@ function getStatementMarkdown(state) {
   const statementBody = state.statementParts?.body?.trim?.() || "";
   if (statementBody) return statementBody;
   const stagePrompt = getActiveStage(state)?.prompt_md || "";
-  return stagePrompt;
+  return localizeStatementMarkdown(stagePrompt);
 }
 
 function splitStatementAndConstraints(md) {
@@ -783,7 +784,7 @@ function splitStatementAndConstraints(md) {
 
 function renderConstraintsSection(constraintsMd) {
   if (!constraintsMd) return "";
-  const constraintsHtml = renderMarkdown(constraintsMd);
+  const constraintsHtml = renderMarkdown(localizeStatementMarkdown(constraintsMd));
   if (!constraintsHtml) return "";
   return `
     <div>
@@ -791,4 +792,20 @@ function renderConstraintsSection(constraintsMd) {
       <div class="prose-content text-sm">${constraintsHtml}</div>
     </div>
   `;
+}
+
+function localizeStatementMarkdown(md) {
+  if (!md) return "";
+  let text = String(md || "");
+
+  text = text.replace(/^(#{1,6})\s*Description\b[:\-]*/gim, "$1 Descripción");
+  text = text.replace(/^(#{1,6})\s*Examples?\b[:\-]*/gim, "$1 Ejemplos");
+  text = text.replace(/^(#{1,6})\s*Constraints?\b[:\-]*/gim, "$1 Restricciones");
+
+  text = text.replace(
+    /Given a string containing only brackets, determine whether it is valid\./gi,
+    "Dada una cadena que contiene solo corchetes, determina si es válida.",
+  );
+
+  return text;
 }
