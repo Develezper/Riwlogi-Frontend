@@ -181,6 +181,9 @@ function renderLayout(container, state) {
                 <button id="btn-run" class="px-3 py-1.5 rounded-md text-xs bg-zinc-700 text-white hover:bg-zinc-600 transition font-medium">
                   Ejecutar
                 </button>
+                <button id="btn-clear-console" class="px-3 py-1.5 rounded-md text-xs text-zinc-300 border border-zinc-700 hover:bg-zinc-800 transition">
+                  Limpiar consola
+                </button>
                 <button id="btn-submit" class="px-3 py-1.5 rounded-md text-xs bg-brand text-white hover:bg-brand-dark transition font-medium">
                   Enviar
                 </button>
@@ -200,6 +203,7 @@ function bindEvents(container, state) {
   const runButton = container.querySelector("#btn-run");
   const submitButton = container.querySelector("#btn-submit");
   const resetButton = container.querySelector("#btn-reset");
+  const clearConsoleButton = container.querySelector("#btn-clear-console");
   const languageSelect = container.querySelector("#lang-select");
   const stageBarContainer = container.querySelector("#stage-bar-container");
   const tabResults = container.querySelector("#tab-results");
@@ -299,6 +303,20 @@ function bindEvents(container, state) {
     }
   };
 
+  const onClearConsole = () => {
+    if (state.isRunning) return;
+
+    const activeStage = getActiveStage(state);
+    if (activeStage && state.stageResults[activeStage.id]) {
+      delete state.stageResults[activeStage.id];
+    }
+
+    state.lastAction = "run";
+    updateStageBar(container, state);
+    updateResultsPanel(container, state);
+    showToast("Consola limpiada", "info");
+  };
+
   const onReset = () => {
     const starter = getStarterCode(state.problem, state.language);
     clearDraft(state.problem.id, state.language);
@@ -358,6 +376,7 @@ function bindEvents(container, state) {
 
   runButton?.addEventListener("click", onRun);
   submitButton?.addEventListener("click", onSubmit);
+  clearConsoleButton?.addEventListener("click", onClearConsole);
   resetButton?.addEventListener("click", onReset);
   languageSelect?.addEventListener("change", onLanguageChange);
   stageBarContainer?.addEventListener("click", onStageClick);
@@ -366,6 +385,7 @@ function bindEvents(container, state) {
 
   state.cleanupFns.push(() => runButton?.removeEventListener("click", onRun));
   state.cleanupFns.push(() => submitButton?.removeEventListener("click", onSubmit));
+  state.cleanupFns.push(() => clearConsoleButton?.removeEventListener("click", onClearConsole));
   state.cleanupFns.push(() => resetButton?.removeEventListener("click", onReset));
   state.cleanupFns.push(() => languageSelect?.removeEventListener("change", onLanguageChange));
   state.cleanupFns.push(() => stageBarContainer?.removeEventListener("click", onStageClick));
@@ -667,6 +687,7 @@ function updatePanelVisibility(container, state) {
 function setButtonsDisabled(container, disabled, mode = "run") {
   const runButton = container.querySelector("#btn-run");
   const submitButton = container.querySelector("#btn-submit");
+  const clearConsoleButton = container.querySelector("#btn-clear-console");
 
   if (runButton) {
     runButton.disabled = disabled;
@@ -676,6 +697,10 @@ function setButtonsDisabled(container, disabled, mode = "run") {
   if (submitButton) {
     submitButton.disabled = disabled;
     submitButton.textContent = disabled && mode === "submit" ? "Enviando..." : "Enviar";
+  }
+
+  if (clearConsoleButton) {
+    clearConsoleButton.disabled = disabled;
   }
 }
 
