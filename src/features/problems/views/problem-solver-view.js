@@ -219,6 +219,7 @@ function bindEvents(container, state) {
     try {
       const code = getCurrentCode(container, state);
       saveDraft(state.problem.id, state.language, code);
+      state.tracker?.setStage(activeStage.id);
       const result = await runStage(state, activeStage.id, code);
 
       const output = extractConsoleOutput(result);
@@ -269,6 +270,7 @@ function bindEvents(container, state) {
       let security = state.lastSecurityCheck;
 
       if (activeStage) {
+        state.tracker?.setStage(activeStage.id);
         const runResult = await runStage(state, activeStage.id, code);
         const output = extractConsoleOutput(runResult);
         state.stageResults[activeStage.id] = {
@@ -323,7 +325,7 @@ function bindEvents(container, state) {
         getInitialCodeForLanguage(state.problem, state.language),
       );
       updateStageBar(container, state);
-      updateResultsPanel(container, state, null, false);
+      updateResultsPanel(container, state);
       showToast(`Lenguaje cambiado a ${languageLabel(state.language)}`, "info");
     } catch (error) {
       showToast(error.message, "error");
