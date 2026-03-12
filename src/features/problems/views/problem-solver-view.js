@@ -136,15 +136,15 @@ function renderLayout(container, state) {
                   .join("")}
               </select>
               <button id="btn-reset" class="px-3 py-1.5 rounded-md text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition" title="Reiniciar código">
-                Reset
+                Reiniciar
               </button>
             </div>
             <div class="flex items-center gap-2">
               <button id="btn-run" class="px-4 py-1.5 rounded-md text-sm bg-zinc-700 text-white hover:bg-zinc-600 transition font-medium">
-                Run
+                Ejecutar
               </button>
               <button id="btn-submit" class="px-4 py-1.5 rounded-md text-sm bg-brand text-white hover:bg-brand-dark transition font-medium">
-                Submit
+                Enviar
               </button>
             </div>
           </div>
@@ -154,7 +154,7 @@ function renderLayout(container, state) {
           <div class="h-[38%] border-t border-zinc-800 flex flex-col min-h-[200px]">
             <div class="px-3 pt-2 border-b border-zinc-800 bg-zinc-900/60 flex items-center gap-2" role="tablist" aria-label="Panel de resultados y casos de prueba">
               <button id="tab-results" role="tab" aria-selected="true" aria-controls="results-panel" data-panel="results" class="px-3 py-1.5 text-xs rounded-t-md bg-zinc-800 text-zinc-200">Resultados</button>
-              <button id="tab-cases" role="tab" aria-selected="false" aria-controls="cases-panel" data-panel="cases" class="px-3 py-1.5 text-xs rounded-t-md text-zinc-500 hover:text-zinc-300">Test Cases</button>
+              <button id="tab-cases" role="tab" aria-selected="false" aria-controls="cases-panel" data-panel="cases" class="px-3 py-1.5 text-xs rounded-t-md text-zinc-500 hover:text-zinc-300">Casos de prueba</button>
             </div>
 
             <div id="results-panel" role="tabpanel" aria-live="polite" class="flex-1 overflow-y-auto p-3"></div>
@@ -199,9 +199,9 @@ function bindEvents(container, state) {
       updateResultsPanel(container, state, result, false);
 
       if (result.passed) {
-        showToast(`Stage ${activeStage.stage_index} passed`, "success");
+        showToast(`Etapa ${activeStage.stage_index} aprobada`, "success");
       } else {
-        showToast(`Stage ${activeStage.stage_index} failed`, "error");
+        showToast(`Etapa ${activeStage.stage_index} fallida`, "error");
       }
     } catch (error) {
       showToast(error.message, "error");
@@ -251,9 +251,9 @@ function bindEvents(container, state) {
 
       if (final.verdict === "accepted") {
         clearDraft(state.problem.id, state.language);
-        showToast(`Accepted. Score final: ${final.final_score}`, "success", 5000);
+        showToast(`Aceptado. Puntaje final: ${final.final_score}`, "success", 5000);
       } else {
-        showToast(`Submission incompleta. Score final: ${final.final_score}`, "error", 5000);
+        showToast(`Envío incompleto. Puntaje final: ${final.final_score}`, "error", 5000);
       }
     } catch (error) {
       showToast(error.message, "error");
@@ -502,7 +502,7 @@ function updateStageContent(container, state) {
 
   if (prompt) {
     prompt.innerHTML = `
-      <h4 class="text-sm font-semibold text-brand mb-2">Stage ${stage.stage_index}</h4>
+      <h4 class="text-sm font-semibold text-brand mb-2">Etapa ${stage.stage_index}</h4>
       <div class="prose-content text-sm">${renderMarkdown(stage.prompt_md || "")}</div>
     `;
   }
@@ -534,21 +534,21 @@ function updateCasesPanel(container, state) {
     .map(
       (stage) => `
       <div class="mb-4 p-3 rounded-lg border border-zinc-800 bg-zinc-900/50">
-        <h4 class="text-sm font-semibold text-zinc-200 mb-2">Stage ${stage.stage_index}</h4>
+        <h4 class="text-sm font-semibold text-zinc-200 mb-2">Etapa ${stage.stage_index}</h4>
 
         ${(stage.visible_tests || [])
           .map(
             (test, index) => `
           <div class="mb-2 rounded-md border border-zinc-700 bg-zinc-800/40 p-3 text-xs font-mono">
-            <p class="text-zinc-400">Input: <span class="text-zinc-200">${test.input_text}</span></p>
-            <p class="text-zinc-400">Expected: <span class="text-green-400">${test.expected_text}</span></p>
-            <p class="text-zinc-500 mt-1">Test visible ${index + 1}</p>
+            <p class="text-zinc-400">Entrada: <span class="text-zinc-200">${test.input_text}</span></p>
+            <p class="text-zinc-400">Esperado: <span class="text-green-400">${test.expected_text}</span></p>
+            <p class="text-zinc-500 mt-1">Prueba visible ${index + 1}</p>
           </div>
         `,
           )
           .join("")}
 
-        <p class="text-xs text-zinc-500">+ ${stage.hidden_count || 0} hidden tests</p>
+        <p class="text-xs text-zinc-500">+ ${stage.hidden_count || 0} pruebas ocultas</p>
       </div>
     `,
     )
@@ -585,12 +585,12 @@ function setButtonsDisabled(container, disabled, mode = "run") {
 
   if (runButton) {
     runButton.disabled = disabled;
-    runButton.textContent = disabled && mode === "run" ? "Running..." : "Run";
+    runButton.textContent = disabled && mode === "run" ? "Ejecutando..." : "Ejecutar";
   }
 
   if (submitButton) {
     submitButton.disabled = disabled;
-    submitButton.textContent = disabled && mode === "submit" ? "Submitting..." : "Submit";
+    submitButton.textContent = disabled && mode === "submit" ? "Enviando..." : "Enviar";
   }
 }
 
@@ -664,24 +664,24 @@ function languageLabel(language) {
 
 function renderVisibleTests(stage) {
   if (!stage || !stage.visible_tests?.length) {
-    return `<p class="text-sm text-zinc-500">No hay tests visibles para esta etapa.</p>`;
+    return `<p class="text-sm text-zinc-500">No hay pruebas visibles para esta etapa.</p>`;
   }
 
   return `
-    <h4 class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">Visible tests</h4>
+    <h4 class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">Pruebas visibles</h4>
     ${stage.visible_tests
       .map(
         (test, index) => `
       <div class="mb-3 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
-        <p class="text-xs font-semibold text-zinc-400 mb-1">Test ${index + 1}</p>
+        <p class="text-xs font-semibold text-zinc-400 mb-1">Prueba ${index + 1}</p>
         <div class="text-xs font-mono">
-          <p class="text-zinc-500">Input: <span class="text-zinc-300">${test.input_text}</span></p>
-          <p class="text-zinc-500">Expected: <span class="text-green-400">${test.expected_text}</span></p>
+          <p class="text-zinc-500">Entrada: <span class="text-zinc-300">${test.input_text}</span></p>
+          <p class="text-zinc-500">Esperado: <span class="text-green-400">${test.expected_text}</span></p>
         </div>
       </div>
     `,
       )
       .join("")}
-    <p class="text-xs text-zinc-500">+ ${stage.hidden_count || 0} hidden tests</p>
+    <p class="text-xs text-zinc-500">+ ${stage.hidden_count || 0} pruebas ocultas</p>
   `;
 }

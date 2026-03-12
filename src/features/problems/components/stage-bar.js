@@ -21,7 +21,7 @@ export function stageBar(stages, currentStage = 0, stageResults = {}) {
                   data-stage-id="${stage.id}"
                   aria-label="Ir a etapa ${stage.stage_index}"
                   aria-current="${isActive ? "step" : "false"}"
-                  title="Stage ${stage.stage_index}">
+                  title="Etapa ${stage.stage_index}">
             ${icon}
           </button>
           ${

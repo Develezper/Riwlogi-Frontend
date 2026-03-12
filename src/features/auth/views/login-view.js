@@ -19,7 +19,7 @@ export function loginView(container) {
 
         <form id="login-form" class="space-y-4" novalidate>
           <div>
-            <label for="login-email" class="block text-sm text-zinc-400 mb-1">Email o username</label>
+            <label for="login-email" class="block text-sm text-zinc-400 mb-1">Correo o usuario</label>
             <input id="login-email" type="text" name="email" required
               autocomplete="username"
               class="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:border-brand transition"

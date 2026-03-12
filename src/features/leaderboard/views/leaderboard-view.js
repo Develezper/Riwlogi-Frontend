@@ -4,7 +4,7 @@ import { spinner } from "../../../shared/utils/ui-helpers.js";
 const FILTERS = [
   { id: "today", label: "Hoy" },
   { id: "week", label: "Semana" },
-  { id: "all", label: "All Time" },
+  { id: "all", label: "Todo el tiempo" },
 ];
 
 function filterButtonClass(active) {
@@ -23,8 +23,8 @@ export async function leaderboardView(container) {
     <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
       <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 class="text-3xl font-bold tracking-tight text-white">Top Thinkers</h1>
-          <p class="mt-1 text-zinc-400">Ranking por score acumulado y constancia.</p>
+          <h1 class="text-3xl font-bold tracking-tight text-white">Top participantes</h1>
+          <p class="mt-1 text-zinc-400">Clasificación por puntaje acumulado y constancia.</p>
         </div>
         <div id="filter-buttons" class="flex items-center gap-2" role="tablist" aria-label="Filtro de tiempo"></div>
       </div>
@@ -80,8 +80,8 @@ export async function leaderboardView(container) {
                   <h3 class="text-sm font-semibold text-zinc-100">${entry.username}</h3>
                   <p class="text-2xl font-bold tabular-nums mt-2 text-white">${entry.score.toLocaleString()}</p>
                   <div class="mt-2 flex items-center gap-3 text-xs text-zinc-300">
-                    <span>${entry.solved} solved</span>
-                    <span>${entry.streak}d streak</span>
+                    <span>${entry.solved} resueltos</span>
+                    <span>${entry.streak} días de racha</span>
                   </div>
                 </div>
               </div>
@@ -94,11 +94,11 @@ export async function leaderboardView(container) {
     const restHtml = `
       <div class="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50">
         <div class="hidden sm:grid grid-cols-[56px_1fr_120px_90px_90px] items-center gap-4 border-b border-zinc-800 bg-zinc-900 px-4 py-3 text-xs font-medium uppercase tracking-wide text-zinc-500">
-          <span class="text-center">Rank</span>
-          <span>User</span>
-          <span class="text-right">Score</span>
-          <span class="text-right">Solved</span>
-          <span class="text-right">Streak</span>
+          <span class="text-center">Posición</span>
+          <span>Usuario</span>
+          <span class="text-right">Puntaje</span>
+          <span class="text-right">Resueltos</span>
+          <span class="text-right">Racha</span>
         </div>
         ${rest
           .map(
@@ -117,7 +117,7 @@ export async function leaderboardView(container) {
             </div>
             <span class="ml-auto sm:ml-0 text-right text-sm font-semibold tabular-nums text-zinc-100">${entry.score.toLocaleString()}</span>
             <span class="hidden sm:block text-right text-sm text-zinc-400">${entry.solved}</span>
-            <span class="hidden sm:block text-right text-sm text-zinc-400">${entry.streak}d</span>
+            <span class="hidden sm:block text-right text-sm text-zinc-400">${entry.streak} días</span>
           </div>
         `,
           )
@@ -140,7 +140,7 @@ export async function leaderboardView(container) {
       if (isDisposed) return;
       contentEl.innerHTML = `
         <div class="text-center py-12 text-zinc-500 border border-zinc-800 rounded-xl bg-zinc-900/50">
-          <p class="text-lg mb-2">Error al cargar leaderboard</p>
+          <p class="text-lg mb-2">Error al cargar la clasificación</p>
           <p class="text-sm">${error.message}</p>
         </div>
       `;

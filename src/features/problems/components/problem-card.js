@@ -17,7 +17,7 @@ export function problemCard(problem) {
             ${problem.title}
           </h3>
           <p class="text-xs text-zinc-500 mt-1">
-            ${problem.submissions?.toLocaleString?.() || problem.submissions || 0} submissions
+            ${problem.submissions?.toLocaleString?.() || problem.submissions || 0} envíos
           </p>
         </div>
         <span class="px-2 py-0.5 rounded-full text-xs font-medium ${badge.class}">
@@ -30,7 +30,7 @@ export function problemCard(problem) {
       </div>
 
       <div class="flex items-center justify-between text-xs text-zinc-500">
-        <span>${Number(problem.acceptance || 0).toFixed(1)}% acceptance</span>
+        <span>${Number(problem.acceptance || 0).toFixed(1)}% de aceptación</span>
         <span>${problem.stages_count} etapas</span>
       </div>
     </a>

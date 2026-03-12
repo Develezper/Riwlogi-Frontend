@@ -37,33 +37,33 @@ function assert(condition, message, payload = null) {
 }
 
 function assertObject(value, context) {
-  assert(value && typeof value === "object" && !Array.isArray(value), `${context} must be an object`, value);
+  assert(value && typeof value === "object" && !Array.isArray(value), `${context} debe ser un objeto`, value);
   return value;
 }
 
 function assertString(value, context) {
-  assert(typeof value === "string" && value.trim().length > 0, `${context} must be a non-empty string`, value);
+  assert(typeof value === "string" && value.trim().length > 0, `${context} debe ser una cadena no vacía`, value);
   return value;
 }
 
 function assertNumber(value, context) {
-  assert(typeof value === "number" && Number.isFinite(value), `${context} must be a finite number`, value);
+  assert(typeof value === "number" && Number.isFinite(value), `${context} debe ser un número finito`, value);
   return value;
 }
 
 function assertBoolean(value, context) {
-  assert(typeof value === "boolean", `${context} must be boolean`, value);
+  assert(typeof value === "boolean", `${context} debe ser booleano`, value);
   return value;
 }
 
 function assertArray(value, context) {
-  assert(Array.isArray(value), `${context} must be an array`, value);
+  assert(Array.isArray(value), `${context} debe ser un arreglo`, value);
   return value;
 }
 
 function validateDifficulty(value, context) {
   const difficulty = assertNumber(value, context);
-  assert([1, 2, 3].includes(difficulty), `${context} must be 1, 2 or 3`, value);
+  assert([1, 2, 3].includes(difficulty), `${context} debe ser 1, 2 o 3`, value);
   return difficulty;
 }
 
@@ -111,7 +111,7 @@ function validateStage(raw, index) {
   return {
     id: assertString(value.id, `problem.stages[${index}].id`),
     stage_index: assertNumber(value.stage_index, `problem.stages[${index}].stage_index`),
-    prompt_md: assertString(value.prompt_md || `Stage ${index + 1}`, `problem.stages[${index}].prompt_md`),
+    prompt_md: assertString(value.prompt_md || `Etapa ${index + 1}`, `problem.stages[${index}].prompt_md`),
     hidden_count: Number(value.hidden_count || 0),
     visible_tests: assertArray(value.visible_tests || [], `problem.stages[${index}].visible_tests`).map(
       (test, testIndex) =>
@@ -123,7 +123,7 @@ function validateStage(raw, index) {
 function validateStarterCode(raw) {
   const value = assertObject(raw, "problem.starter_code");
   const entries = Object.entries(value).filter(([, code]) => typeof code === "string" && code.trim().length > 0);
-  assert(entries.length > 0, "problem.starter_code must contain at least one non-empty language", raw);
+  assert(entries.length > 0, "problem.starter_code debe contener al menos un lenguaje no vacío", raw);
   return Object.fromEntries(entries.map(([language, code]) => [language, code]));
 }
 
@@ -311,7 +311,11 @@ function validateAdminProblem(raw, index) {
 
 export function parseHealthResponse(payload) {
   const value = assertObject(payload, "health");
-  assert(value.ok === true || value.status === "ok", "health response must contain ok=true or status='ok'", payload);
+  assert(
+    value.ok === true || value.status === "ok",
+    "health response debe contener ok=true o status='ok'",
+    payload,
+  );
   return { ok: true };
 }
 

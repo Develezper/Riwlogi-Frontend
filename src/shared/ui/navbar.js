@@ -4,7 +4,7 @@ import { api } from "../services/api/index.js";
 
 const publicLinks = [
   { path: "problems", label: "Problemas" },
-  { path: "leaderboard", label: "Leaderboard" },
+  { path: "leaderboard", label: "Clasificación" },
 ];
 
 let detachListeners = null;
@@ -88,7 +88,7 @@ export function renderNavbar() {
   const user = store.getUser();
   const isAuth = store.isAuthenticated();
   const isAdmin = isAuth && user?.role === "admin";
-  const links = isAdmin ? [...publicLinks, { path: "admin", label: "Admin" }] : publicLinks;
+  const links = isAdmin ? [...publicLinks, { path: "admin", label: "Administración" }] : publicLinks;
   const activePath = currentPath();
 
   nav.className = "sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md";

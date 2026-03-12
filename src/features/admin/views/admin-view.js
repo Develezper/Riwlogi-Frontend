@@ -22,7 +22,7 @@ const sourceConfig = {
     className: "text-zinc-300 bg-zinc-700/30 border-zinc-600/40",
   },
   custom: {
-    label: "Custom",
+    label: "Personalizado",
     className: "text-sky-300 bg-sky-500/10 border-sky-500/30",
   },
   ai: {
@@ -33,16 +33,18 @@ const sourceConfig = {
 
 function difficultyLabel(level) {
   const map = {
-    1: "Easy",
-    2: "Medium",
-    3: "Hard",
+    1: "Fácil",
+    2: "Intermedio",
+    3: "Difícil",
   };
-  return map[Number(level)] || "Easy";
+  return map[Number(level)] || "Fácil";
 }
 
 function formatDateTime(value) {
+  if (value === null || value === undefined || value === "") return "-";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
+  const timestamp = date.getTime();
+  if (Number.isNaN(timestamp) || timestamp <= 0) return "-";
   return date.toLocaleString("es-CO", {
     year: "numeric",
     month: "short",
@@ -52,6 +54,26 @@ function formatDateTime(value) {
   });
 }
 
+function formatLastActive(value) {
+  const formatted = formatDateTime(value);
+  return formatted === "-" ? "Sin actividad" : formatted;
+}
+
+function activityTypeLabel(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "Actividad";
+  const map = {
+    submission: "Envío",
+    submission_accepted: "Envío aceptado",
+    system: "Sistema",
+    user: "Usuario",
+  };
+  if (map[raw]) return map[raw];
+  return raw
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
 function parseCsv(value) {
   return [...new Set(String(value || "").split(",").map((item) => item.trim()).filter(Boolean))];
 }
@@ -59,6 +81,13 @@ function parseCsv(value) {
 function formatList(values = []) {
   if (!Array.isArray(values)) return "";
   return values.join(", ");
+}
+
+function roleLabel(role, isAdmin) {
+  const normalized = String(role || (isAdmin ? "admin" : "user")).trim().toLowerCase();
+  if (normalized === "admin") return "Administrador";
+  if (normalized === "user") return "Usuario";
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Usuario";
 }
 
 function stageEditorJson(problem) {
@@ -107,7 +136,7 @@ function renderDashboard(container, state) {
   if (state.error && !state.overview) {
     container.innerHTML = `
       <section class="max-w-4xl mx-auto px-4 py-12 text-center">
-        <h1 class="text-2xl font-semibold text-zinc-100">Panel admin no disponible</h1>
+        <h1 class="text-2xl font-semibold text-zinc-100">Panel de administración no disponible</h1>
         <p class="mt-3 text-zinc-400">${escapeHtml(state.error)}</p>
         <button data-action="refresh-admin" class="mt-6 px-4 py-2 rounded-lg bg-brand text-white hover:bg-brand-dark transition">Reintentar</button>
       </section>
@@ -149,7 +178,7 @@ function renderDashboard(container, state) {
     <section class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
       <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 class="text-3xl font-bold text-zinc-100">Admin Console</h1>
+          <h1 class="text-3xl font-bold text-zinc-100">Consola de administración</h1>
           <p class="text-zinc-400 mt-1">Gestión integral de usuarios, métricas y ejercicios IA.</p>
           <p class="text-xs text-zinc-500 mt-1">Última actualización: ${escapeHtml(formatDateTime(overview.updated_at))}</p>
         </div>
@@ -167,7 +196,7 @@ function renderDashboard(container, state) {
       <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         ${kpiCard("Usuarios", kpis.total_users || 0, `${kpis.active_users_7d || 0} activos en 7 días`)}
         ${kpiCard("Problemas", kpis.total_problems || 0, `${kpis.published_problems || 0} publicados`)}
-        ${kpiCard("Submissions", kpis.total_submissions || 0, `${kpis.accepted_submissions || 0} accepted`)}
+        ${kpiCard("Envíos", kpis.total_submissions || 0, `${kpis.accepted_submissions || 0} aceptados`)}
         ${kpiCard("Aceptación", `${Number(kpis.acceptance_rate || 0).toFixed(1)}%`, `${kpis.ai_generated_problems || 0} generados por IA`)}
       </div>
 
@@ -175,97 +204,21 @@ function renderDashboard(container, state) {
         <div class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-zinc-100">Generación de ejercicios con IA</h2>
-            <span class="text-xs text-zinc-500">Front listo para integrar motor IA en backend</span>
+            <span class="text-xs text-zinc-500">Un prompt para construir todo el ejercicio</span>
           </div>
 
-          <form id="generate-ai-form" class="grid grid-cols-1 md:grid-cols-2 gap-4" novalidate>
+          <form id="generate-ai-form" class="grid grid-cols-1 gap-4" novalidate>
             <div>
-              <label for="ai-title" class="block text-xs text-zinc-400 mb-1">Título / tema</label>
-              <input id="ai-title" name="title_hint" required placeholder="Ej: Matching de inventario en tiempo real"
-                class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
-            </div>
-
-            <div>
-              <label for="ai-tags" class="block text-xs text-zinc-400 mb-1">Tags (coma)</label>
-              <input id="ai-tags" name="tags" placeholder="arrays, hashing, backend"
-                class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
-            </div>
-
-            <div>
-              <label for="ai-difficulty" class="block text-xs text-zinc-400 mb-1">Dificultad</label>
-              <select id="ai-difficulty" name="difficulty"
-                class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition">
-                <option value="1">Easy</option>
-                <option value="2" selected>Medium</option>
-                <option value="3">Hard</option>
-              </select>
-            </div>
-
-            <div>
-              <label for="ai-langs" class="block text-xs text-zinc-400 mb-1">Lenguajes target</label>
-              <input id="ai-langs" name="target_languages" value="python,javascript"
-                class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
-            </div>
-
-            <div>
-              <label for="ai-stage-count" class="block text-xs text-zinc-400 mb-1">Etapas</label>
-              <input id="ai-stage-count" name="stage_count" type="number" min="1" max="5" value="2"
-                class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label for="ai-visible-tests" class="block text-xs text-zinc-400 mb-1">Tests visibles</label>
-                <input id="ai-visible-tests" name="visible_tests_per_stage" type="number" min="1" max="6" value="2"
-                  class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
-              </div>
-              <div>
-                <label for="ai-hidden-tests" class="block text-xs text-zinc-400 mb-1">Tests ocultos</label>
-                <input id="ai-hidden-tests" name="hidden_tests_per_stage" type="number" min="1" max="10" value="2"
-                  class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
-              </div>
-            </div>
-
-            <div class="md:col-span-2">
-              <label for="ai-prompt" class="block text-xs text-zinc-400 mb-1">Prompt maestro para IA</label>
-              <textarea id="ai-prompt" name="prompt" rows="4" required
-                placeholder="Define objetivo, enfoque, output esperado y estilo pedagógico del ejercicio..."
+              <label for="ai-prompt" class="block text-xs text-zinc-400 mb-1">Prompt único del administrador</label>
+              <textarea id="ai-prompt" name="prompt" rows="6" required minlength="10"
+                placeholder="Describe la idea de negocio, reglas, datos y lo que debe devolver la IA. Ej: Sistema de inventario con alertas en tiempo real, roles y endpoints."
                 class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition"></textarea>
+              <p class="mt-2 text-xs text-zinc-500">
+                La IA generará título, etiquetas, dificultad, etapas, pruebas, rúbrica y narrativa completa.
+              </p>
             </div>
 
-            <div class="md:col-span-2">
-              <label for="ai-context" class="block text-xs text-zinc-400 mb-1">Contexto de negocio / producto</label>
-              <textarea id="ai-context" name="business_context" rows="2"
-                placeholder="Contexto funcional que debe usar la IA para construir la narrativa del ejercicio"
-                class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition"></textarea>
-            </div>
-
-            <div>
-              <label for="ai-constraints" class="block text-xs text-zinc-400 mb-1">Restricciones</label>
-              <textarea id="ai-constraints" name="constraints" rows="2"
-                placeholder="Complejidad, memoria, límites, edge cases"
-                class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition"></textarea>
-            </div>
-
-            <div>
-              <label for="ai-examples" class="block text-xs text-zinc-400 mb-1">Ejemplos de entrada/salida</label>
-              <textarea id="ai-examples" name="examples" rows="2"
-                placeholder="Input: ... Output: ..."
-                class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition"></textarea>
-            </div>
-
-            <div class="md:col-span-2">
-              <label for="ai-rubric" class="block text-xs text-zinc-400 mb-1">Rubrica de evaluación</label>
-              <textarea id="ai-rubric" name="evaluation_rubric" rows="2"
-                placeholder="Qué debe evaluar cada etapa y cómo puntuar"
-                class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition"></textarea>
-            </div>
-
-            <div class="md:col-span-2 flex items-center justify-between gap-4 pt-1">
-              <label class="inline-flex items-center gap-2 text-sm text-zinc-300">
-                <input type="checkbox" name="publish" class="rounded border-zinc-700 bg-zinc-900 text-brand" />
-                Publicar inmediatamente
-              </label>
+            <div class="flex items-center justify-end gap-4 pt-1">
               <button type="submit" class="px-4 py-2 rounded-lg bg-brand text-white hover:bg-brand-dark transition">
                 Generar ejercicio IA
               </button>
@@ -275,7 +228,7 @@ function renderDashboard(container, state) {
 
         <div class="space-y-6">
           <div class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-            <h2 class="text-lg font-semibold text-zinc-100 mb-4">Top tags</h2>
+            <h2 class="text-lg font-semibold text-zinc-100 mb-4">Etiquetas principales</h2>
             <div class="space-y-2">
               ${
                 overview.top_tags?.length
@@ -284,12 +237,12 @@ function renderDashboard(container, state) {
                         (row) => `
                       <div class="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2 text-sm">
                         <span class="text-zinc-200">${escapeHtml(row.tag)}</span>
-                        <span class="text-zinc-500">${escapeHtml(String(row.count || 0))}</span>
+                        <span class="text-zinc-500">${escapeHtml(`${row.count || 0} usos`)}</span>
                       </div>
                     `,
                       )
                       .join("")
-                  : `<p class="text-sm text-zinc-500">Sin tags suficientes aún.</p>`
+                  : `<p class="text-sm text-zinc-500">Sin etiquetas suficientes aún.</p>`
               }
             </div>
           </div>
@@ -304,7 +257,7 @@ function renderDashboard(container, state) {
                         (item) => `
                       <div class="rounded-lg border border-zinc-800 px-3 py-2">
                         <p class="text-sm text-zinc-100">${escapeHtml(item.label)}</p>
-                        <p class="text-xs text-zinc-500 mt-1">${escapeHtml(item.type)} · ${escapeHtml(
+                        <p class="text-xs text-zinc-500 mt-1">${escapeHtml(activityTypeLabel(item.type))} · ${escapeHtml(
                           formatDateTime(item.created_at),
                         )}</p>
                       </div>
@@ -322,7 +275,7 @@ function renderDashboard(container, state) {
         <div class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-zinc-100">Catálogo de ejercicios</h2>
-            <p class="text-xs text-zinc-500">${escapeHtml(String(problems.length))} items</p>
+            <p class="text-xs text-zinc-500">${escapeHtml(String(problems.length))} elementos</p>
           </div>
 
           <div class="overflow-x-auto">
@@ -409,9 +362,9 @@ function renderDashboard(container, state) {
                       <label for="edit-difficulty" class="block text-xs text-zinc-400 mb-1">Dificultad</label>
                       <select id="edit-difficulty" name="difficulty"
                         class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition">
-                        <option value="1" ${editValues.difficulty === "1" ? "selected" : ""}>Easy</option>
-                        <option value="2" ${editValues.difficulty === "2" ? "selected" : ""}>Medium</option>
-                        <option value="3" ${editValues.difficulty === "3" ? "selected" : ""}>Hard</option>
+                        <option value="1" ${editValues.difficulty === "1" ? "selected" : ""}>Fácil</option>
+                        <option value="2" ${editValues.difficulty === "2" ? "selected" : ""}>Intermedio</option>
+                        <option value="3" ${editValues.difficulty === "3" ? "selected" : ""}>Difícil</option>
                       </select>
                     </div>
 
@@ -427,13 +380,13 @@ function renderDashboard(container, state) {
                   </div>
 
                   <div>
-                    <label for="edit-tags" class="block text-xs text-zinc-400 mb-1">Tags (coma)</label>
+                    <label for="edit-tags" class="block text-xs text-zinc-400 mb-1">Etiquetas (coma)</label>
                     <input id="edit-tags" name="tags" value="${escapeHtml(editValues.tags)}"
                       class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
                   </div>
 
                   <div>
-                    <label for="edit-statement" class="block text-xs text-zinc-400 mb-1">Statement (Markdown)</label>
+                    <label for="edit-statement" class="block text-xs text-zinc-400 mb-1">Enunciado (Markdown)</label>
                     <textarea id="edit-statement" name="statement_md" rows="5"
                       class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition">${escapeHtml(
                         editValues.statement_md,
@@ -441,7 +394,7 @@ function renderDashboard(container, state) {
                   </div>
 
                   <div>
-                    <label for="edit-python" class="block text-xs text-zinc-400 mb-1">Starter code Python</label>
+                    <label for="edit-python" class="block text-xs text-zinc-400 mb-1">Código inicial Python</label>
                     <textarea id="edit-python" name="starter_python" rows="4"
                       class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100 focus:outline-none focus:border-brand transition">${escapeHtml(
                         editValues.starter_python,
@@ -449,7 +402,7 @@ function renderDashboard(container, state) {
                   </div>
 
                   <div>
-                    <label for="edit-js" class="block text-xs text-zinc-400 mb-1">Starter code JavaScript</label>
+                    <label for="edit-js" class="block text-xs text-zinc-400 mb-1">Código inicial JavaScript</label>
                     <textarea id="edit-js" name="starter_javascript" rows="4"
                       class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100 focus:outline-none focus:border-brand transition">${escapeHtml(
                         editValues.starter_javascript,
@@ -457,12 +410,12 @@ function renderDashboard(container, state) {
                   </div>
 
                   <div>
-                    <label for="edit-stages" class="block text-xs text-zinc-400 mb-1">Stages JSON</label>
+                    <label for="edit-stages" class="block text-xs text-zinc-400 mb-1">JSON de etapas</label>
                     <textarea id="edit-stages" name="stages_json" rows="8"
                       class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100 focus:outline-none focus:border-brand transition">${escapeHtml(
                         editValues.stages_json,
                       )}</textarea>
-                    <p class="text-[11px] text-zinc-500 mt-1">Cada stage debe incluir: stage_index, prompt_md, hidden_count, visible_tests.</p>
+                    <p class="text-[11px] text-zinc-500 mt-1">Cada etapa debe incluir: stage_index, prompt_md, hidden_count, visible_tests.</p>
                   </div>
 
                   <button type="submit" class="w-full px-4 py-2 rounded-lg bg-brand text-white hover:bg-brand-dark transition">
@@ -487,7 +440,7 @@ function renderDashboard(container, state) {
               <tr class="text-left text-zinc-500 border-b border-zinc-800">
                 <th class="py-2 pr-3">Usuario</th>
                 <th class="py-2 pr-3">Rol</th>
-                <th class="py-2 pr-3">Submissions</th>
+                <th class="py-2 pr-3">Envíos</th>
                 <th class="py-2 pr-3">Resueltos</th>
                 <th class="py-2 pr-3">Última actividad</th>
                 <th class="py-2">Acciones</th>
@@ -509,11 +462,11 @@ function renderDashboard(container, state) {
                             user.is_admin
                               ? "text-brand bg-brand/10 border-brand/30"
                               : "text-zinc-300 bg-zinc-700/30 border-zinc-600/40"
-                          }">${escapeHtml(user.role || (user.is_admin ? "admin" : "user"))}</span>
+                          }">${escapeHtml(roleLabel(user.role, user.is_admin))}</span>
                         </td>
                         <td class="py-3 pr-3 text-zinc-300">${escapeHtml(String(user.submissions_count || 0))}</td>
                         <td class="py-3 pr-3 text-zinc-300">${escapeHtml(String(user.solved_count || 0))}</td>
-                        <td class="py-3 pr-3 text-zinc-500">${escapeHtml(formatDateTime(user.last_active_at))}</td>
+                        <td class="py-3 pr-3 text-zinc-500">${escapeHtml(formatLastActive(user.last_active_at))}</td>
                         <td class="py-3">
                           ${
                             user.is_admin
@@ -599,7 +552,7 @@ export async function adminView(container) {
       }
     } catch (error) {
       if (!isMounted) return;
-      state.error = error?.message || "No se pudo cargar el panel admin.";
+      state.error = error?.message || "No se pudo cargar el panel de administración.";
       if (state.overview) {
         showToast(state.error, "error");
       }
@@ -652,7 +605,7 @@ export async function adminView(container) {
       const userId = String(trigger.dataset.userId || "").trim();
       if (!userId) return;
 
-      const confirmed = window.confirm("¿Eliminar este usuario y sus submissions?");
+      const confirmed = window.confirm("¿Eliminar este usuario y sus envíos?");
       if (!confirmed) return;
 
       try {
@@ -675,28 +628,19 @@ export async function adminView(container) {
       const formData = new FormData(form);
 
       try {
+        const prompt = String(formData.get("prompt") || "").trim();
+        if (prompt.length < 10) {
+          throw new Error("El prompt debe tener al menos 10 caracteres.");
+        }
+
         const payload = {
-          title_hint: formData.get("title_hint"),
-          tags: parseCsv(formData.get("tags")),
-          difficulty: Number(formData.get("difficulty") || 1),
-          target_languages: parseCsv(formData.get("target_languages")),
-          stage_count: Number(formData.get("stage_count") || 2),
-          visible_tests_per_stage: Number(formData.get("visible_tests_per_stage") || 2),
-          hidden_tests_per_stage: Number(formData.get("hidden_tests_per_stage") || 2),
-          prompt: formData.get("prompt"),
-          business_context: formData.get("business_context"),
-          constraints: formData.get("constraints"),
-          examples: formData.get("examples"),
-          evaluation_rubric: formData.get("evaluation_rubric"),
-          publish: formData.get("publish") === "on",
+          prompt,
         };
 
         const created = await api.admin.generateProblem(payload);
         showToast("Ejercicio generado y guardado.", "success");
 
         form.reset();
-        const selectedDifficulty = form.querySelector('select[name="difficulty"]');
-        if (selectedDifficulty) selectedDifficulty.value = "2";
 
         state.selectedProblemId = created.id;
         await loadData();
