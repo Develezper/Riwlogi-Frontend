@@ -1,4 +1,4 @@
-import { parseCsv, stageEditorJson } from "../../utils/admin-utils.js";
+import { parseCsv } from "../../utils/admin-utils.js";
 import { syncStageEditorJsonField } from "../../utils/stage-editor.js";
 
 function parseStagesJsonValue(rawValue) {
@@ -65,6 +65,7 @@ export function buildProblemDraftFromForm(form, baseProblem) {
 
 export function buildUpdatePayloadFromProblem(problem, options = {}) {
   const status = String(options.status || problem.status || "draft");
+  const stages = [normalizeSingleStage(problem.stages)];
   const payload = {
     title: String(problem.title || "").trim(),
     slug: String(problem.slug || "").trim(),
@@ -76,7 +77,8 @@ export function buildUpdatePayloadFromProblem(problem, options = {}) {
       python: String(problem.starter_code?.python || "").trimEnd(),
       javascript: String(problem.starter_code?.javascript || "").trimEnd(),
     },
-    stages_json: stageEditorJson(problem),
+    stages,
+    stages_count: 1,
     source: "ai",
   };
 

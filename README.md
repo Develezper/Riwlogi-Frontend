@@ -27,6 +27,9 @@ Variables en `.env`:
 - `VITE_API_MODE=hybrid`: intenta backend al iniciar, si no responde usa local.
 - `VITE_API_MODE=remote`: exige backend remoto; si falla, no inicia.
 - `VITE_API_BASE=/api`: base URL del backend.
+- `VITE_DEV_API_TARGET=http://localhost:8000`: target del proxy `/api` cuando ejecutas `bun run dev`.
+
+En entorno Docker con Nginx, `/api/*` se proxea a `http://backend:8000/api/*`.
 
 Contrato backend: `docs/api-contract.md`.
 
