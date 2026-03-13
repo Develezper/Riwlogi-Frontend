@@ -25,6 +25,129 @@ import {
 } from "./admin-ai-generate/prompt-analysis.js";
 import { renderEditPhase, renderPromptPhase } from "./admin-ai-generate/render.js";
 
+function extractErrorText(error) {
+  const message = String(error?.message || "").trim();
+  const payload = error?.payload;
+  if (!payload || typeof payload !== "object") return message;
+
+  const payloadMessage = [payload.message, payload.detail, payload.error]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return [message, payloadMessage].filter(Boolean).join(" ");
+}
+
+function isAiQuotaError(error) {
+  const status = Number(error?.status || 0);
+  if ([402, 429].includes(status)) return true;
+
+  const text = extractErrorText(error).toLowerCase();
+  if (!text) return false;
+
+  return [
+    "insufficient_quota",
+    "quota",
+    "rate limit",
+    "too many requests",
+    "credit",
+    "billing",
+    "api key",
+    "key exhausted",
+  ].some((hint) => text.includes(hint));
+}
+
+function resolveGenerationErrorMessage(error) {
+  if (isAiQuotaError(error)) {
+    return "La clave de IA se agotó o alcanzó su límite. Verifica cuota/facturación y vuelve a intentar.";
+  }
+
+  return String(error?.message || "").trim() || "Hubo un error durante la generación.";
+}
+
+function sanitizeGeneratedTitle(rawTitle, fallbackTitle) {
+  const sourceTitle = String(rawTitle || fallbackTitle || "").trim();
+  if (!sourceTitle) return String(fallbackTitle || "Ejercicio").trim();
+
+  // Strip leading counters like "5 " leaked from "5 ejercicios" prompts.
+  const cleaned = sourceTitle.replace(/^\d+\s+/, "").replace(/\s+/g, " ").trim();
+  return cleaned || String(fallbackTitle || "Ejercicio").trim();
+}
+
+function sanitizeGeneratedStatement(rawStatement) {
+  const statement = String(rawStatement || "");
+  if (!statement.trim()) return statement;
+
+  const marker = "Instrucciones internas para esta generación:";
+  const markerIndex = statement.indexOf(marker);
+  if (markerIndex < 0) return statement.trim();
+
+  const beforeMarker = statement.slice(0, markerIndex).trim();
+  const notesIndex = statement.indexOf("## Notes", markerIndex);
+  const notesBlock = notesIndex >= 0 ? statement.slice(notesIndex).trim() : "";
+
+  return [beforeMarker, notesBlock].filter(Boolean).join("\n\n").trim();
+}
+
+function normalizeGeneratedProblem(problem, options = {}) {
+  const safeProblem = problem && typeof problem === "object" ? problem : {};
+  const fallbackTitle = String(options.fallbackTitle || "Ejercicio").trim() || "Ejercicio";
+  const targetDifficulty = Number(options.targetDifficulty || 0);
+
+  const normalized = {
+    ...safeProblem,
+    title: sanitizeGeneratedTitle(safeProblem.title, fallbackTitle),
+    statement_md: sanitizeGeneratedStatement(safeProblem.statement_md),
+  };
+
+  if ([1, 2, 3].includes(targetDifficulty)) {
+    normalized.difficulty = targetDifficulty;
+  }
+
+  return normalized;
+}
+
+function hasPlaceholderVisibleTests(problem) {
+  const firstStage = Array.isArray(problem?.stages) ? problem.stages[0] : null;
+  const tests = Array.isArray(firstStage?.visible_tests) ? firstStage.visible_tests : [];
+  if (!tests.length) return true;
+
+  return tests.some((test) => {
+    const inputText = String(test?.input_text || "").toLowerCase();
+    const expectedText = String(test?.expected_text || "").toLowerCase();
+    return (
+      inputText.includes("example_input") ||
+      expectedText.includes("example_output") ||
+      (!inputText.trim() && !expectedText.trim())
+    );
+  });
+}
+
+function detectLowQualityReason(problem) {
+  const title = String(problem?.title || "").trim();
+  const statement = String(problem?.statement_md || "").trim();
+
+  if (!title || title.length < 6) {
+    return "titulo invalido";
+  }
+
+  if (!statement || statement.length < 120) {
+    return "enunciado insuficiente";
+  }
+
+  const compactStatement = statement.toLowerCase();
+  const compactTitle = title.toLowerCase();
+  if (compactStatement === compactTitle || compactStatement.includes("## description\n\n" + compactTitle)) {
+    return "enunciado generico";
+  }
+
+  if (hasPlaceholderVisibleTests(problem)) {
+    return "tests de ejemplo";
+  }
+
+  return null;
+}
+
 export async function adminAiGenerateView(container) {
   const state = {
     phase: "prompt",
@@ -103,21 +226,50 @@ export async function adminAiGenerateView(container) {
             state.generationMessage =
               attempt === 1
                 ? `Generando ejercicio ${index + 1} de ${batchCount}…`
-                : `Evitando duplicado en ejercicio ${index + 1} (intento ${attempt}/${MAX_UNIQUE_ATTEMPTS})…`;
+                : `Reintentando ejercicio ${index + 1} (intento ${attempt}/${MAX_UNIQUE_ATTEMPTS})…`;
             render();
 
             const candidate = await api.admin.generateProblem({ prompt: composedPrompt });
-            const duplicateReason = detectDuplicateReason(candidate, createdProblems);
+            const normalizedCandidate = normalizeGeneratedProblem(candidate, {
+              fallbackTitle: `Ejercicio ${index + 1}`,
+              targetDifficulty: difficulty,
+            });
+
+            const duplicateReason = detectDuplicateReason(normalizedCandidate, createdProblems);
             if (!duplicateReason) {
-              created = candidate;
+              const lowQualityReason = detectLowQualityReason(normalizedCandidate);
+              if (lowQualityReason) {
+                lastDuplicateReason = lowQualityReason;
+                continue;
+              }
+
+              created = normalizedCandidate;
               break;
             }
 
+<<<<<<< HEAD
+            if (duplicateReason === "titulo") {
+              const renamedCandidate = ensureUniqueProblemTitle(normalizedCandidate, createdProblems, {
+                fallbackBaseTitle: `Ejercicio ${index + 1}`,
+              });
+              if (renamedCandidate) {
+                created = renamedCandidate;
+                break;
+              }
+            }
+
+=======
+>>>>>>> 65349b16aff115380a2014671b81521500f54d39
             lastDuplicateReason = duplicateReason;
           }
 
           if (!created) {
-            const reasonText = lastDuplicateReason ? ` (${lastDuplicateReason} repetido)` : "";
+            const repeatedReasons = new Set(["titulo", "enunciado"]);
+            const reasonText = lastDuplicateReason
+              ? repeatedReasons.has(lastDuplicateReason)
+                ? ` (${lastDuplicateReason} repetido)`
+                : ` (${lastDuplicateReason})`
+              : "";
             throw new Error(
               `No se pudo generar un ejercicio único para la posición ${index + 1}${reasonText}. Intenta ajustar el prompt.`,
             );
@@ -153,6 +305,8 @@ export async function adminAiGenerateView(container) {
       } catch (error) {
         if (!isMounted) return;
 
+        const resolvedErrorMessage = resolveGenerationErrorMessage(error);
+
         state.isGenerating = false;
         state.generationCurrent = 0;
         state.generationTotal = 0;
@@ -162,11 +316,11 @@ export async function adminAiGenerateView(container) {
           state.generatedProblem = createdProblems[0];
           state.phase = "edit";
           state.savedProblemId = null;
-          state.error = `${error?.message || "Hubo un error durante la generación."} Se generaron ${createdProblems.length} ejercicio(s).`;
+          state.error = `${resolvedErrorMessage} Se generaron ${createdProblems.length} ejercicio(s).`;
           render();
           showToast("Generación parcial completada. Revisa los ejercicios creados.", "error");
         } else {
-          state.error = error?.message || "No se pudo generar el ejercicio.";
+          state.error = resolvedErrorMessage;
           render();
         }
       }
