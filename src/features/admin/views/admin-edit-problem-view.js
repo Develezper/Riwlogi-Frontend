@@ -80,10 +80,10 @@ function buildEditFormHtml(problem) {
       </div>
 
       <div>
-        <label class="block text-xs text-zinc-400 mb-2">Etapas y tests</label>
+        <label class="block text-xs text-zinc-400 mb-2">Etapa única y tests</label>
         ${stagesEditor}
         <p class="text-[11px] text-zinc-500 mt-2">
-          Cada etapa se guarda con: <code class="text-zinc-400">stage_index</code>, <code class="text-zinc-400">prompt_md</code>, <code class="text-zinc-400">hidden_count</code> y <code class="text-zinc-400">visible_tests</code>.
+          La etapa se guarda con: <code class="text-zinc-400">stage_index</code>, <code class="text-zinc-400">prompt_md</code>, <code class="text-zinc-400">hidden_count</code> y <code class="text-zinc-400">visible_tests</code>.
         </p>
       </div>
 

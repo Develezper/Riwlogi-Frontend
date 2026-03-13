@@ -75,6 +75,33 @@ function validateDifficulty(value, context) {
   return difficulty;
 }
 
+function fallbackSingleStage(problemId = "problem") {
+  return {
+    id: `${problemId}-stage-1`,
+    stage_index: 1,
+    prompt_md: "Implementa la solución completa.",
+    hidden_count: 0,
+    visible_tests: [],
+  };
+}
+
+function normalizeSingleStage(stages, problemId = "problem") {
+  const list = Array.isArray(stages) ? stages : [];
+  if (!list.length) return [fallbackSingleStage(problemId)];
+
+  const first = list[0];
+  return [
+    {
+      ...first,
+      id: String(first.id || `${problemId}-stage-1`),
+      stage_index: 1,
+      prompt_md: String(first.prompt_md || "Implementa la solución completa."),
+      hidden_count: Number(first.hidden_count || 0),
+      visible_tests: Array.isArray(first.visible_tests) ? first.visible_tests : [],
+    },
+  ];
+}
+
 function validateUser(raw, context = "user") {
   const value = assertObject(raw, context);
 
@@ -101,7 +128,7 @@ function validateProblemSummary(raw, index = 0) {
     ),
     acceptance: Number(value.acceptance || 0),
     submissions: Number(value.submissions || 0),
-    stages_count: Number(value.stages_count || 0),
+    stages_count: 1,
   };
 }
 
@@ -137,14 +164,18 @@ function validateStarterCode(raw) {
 
 function validateProblem(raw) {
   const value = assertObject(raw, "problem");
+  const summary = validateProblemSummary(value, 0);
+  const rawStages = assertArray(value.stages || [], "problem.stages").map((stage, index) =>
+    validateStage(stage, index),
+  );
+  const stages = normalizeSingleStage(rawStages, summary.slug || summary.id);
 
   return {
-    ...validateProblemSummary(value, 0),
+    ...summary,
+    stages_count: 1,
     statement_md: assertString(value.statement_md || "", "problem.statement_md"),
     starter_code: validateStarterCode(value.starter_code || value.starterCode || {}),
-    stages: assertArray(value.stages || [], "problem.stages").map((stage, index) =>
-      validateStage(stage, index),
-    ),
+    stages,
   };
 }
 

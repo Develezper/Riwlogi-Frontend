@@ -26,7 +26,6 @@ const EXERCISE_NOUNS = new Set([
   "challenge",
   "challenges",
 ]);
-const STAGE_NOUNS = new Set(["etapa", "etapas", "etpas", "stage", "stages"]);
 const EASY_TOKENS = new Set(["facil", "faciles", "easy"]);
 const MEDIUM_TOKENS = new Set(["intermedio", "intermedios", "medio", "medios", "medium"]);
 const ALL_TOKENS = new Set(["todo", "todos", "toda", "todas"]);
@@ -70,28 +69,6 @@ export function detectPromptExerciseCount(prompt) {
   if (!tokens.length) return null;
 
   return detectCountBeforeNouns(tokens, EXERCISE_NOUNS, DEFAULT_BATCH_COUNT, 1, MAX_BATCH_COUNT);
-}
-
-export function detectPromptStageCount(prompt) {
-  const tokens = tokenizeComparableText(prompt);
-  if (!tokens.length) return null;
-
-  const fromBefore = detectCountBeforeNouns(tokens, STAGE_NOUNS, 3, 1, 20);
-  if (fromBefore !== null) return fromBefore;
-
-  for (let index = 0; index < tokens.length; index += 1) {
-    if (!STAGE_NOUNS.has(tokens[index])) continue;
-
-    const direct = parseCountFromIndex(tokens, index + 1, 3, 1, 20);
-    if (direct !== null) return direct;
-
-    if (CONNECTOR_TOKENS.has(tokens[index + 1])) {
-      const throughConnector = parseCountFromIndex(tokens, index + 2, 3, 1, 20);
-      if (throughConnector !== null) return throughConnector;
-    }
-  }
-
-  return null;
 }
 
 function isHardToken(token) {
@@ -234,20 +211,8 @@ function difficultyPromptLabel(level) {
   return "Intermedio";
 }
 
-function buildStageInstruction(stagesMode, customStageCount) {
-  if (stagesMode === "custom") {
-    return `Debes crear exactamente ${customStageCount} etapas.`;
-  }
-  return "Si no se especifican etapas, decide entre 2 o 3; en caso de duda usa 3.";
-}
-
-export function resolveStageInstruction(prompt, stagesMode, customStageCount) {
-  const promptStageCount = detectPromptStageCount(prompt);
-  if (promptStageCount !== null) {
-    return "Respeta la cantidad de etapas indicada en el prompt base.";
-  }
-
-  return buildStageInstruction(stagesMode, customStageCount);
+export function resolveStageInstruction() {
+  return "Debes crear exactamente una sola etapa (stage_index = 1).";
 }
 
 function buildUniquenessInstruction(existingProblems, attempt = 1) {
@@ -280,7 +245,7 @@ export function buildGenerationPrompt({
   batchCount,
   difficulty,
   difficultyFromPrompt = false,
-  stageInstruction,
+  stageInstruction = resolveStageInstruction(),
   existingProblems = [],
   attempt = 1,
 }) {
@@ -298,5 +263,5 @@ export function buildGenerationPrompt({
     `${difficultyInstruction}\n` +
     `- ${stageInstruction}\n` +
     `${uniquenessInstruction}\n` +
-    `- Las etapas deben ser consecutivas y cada una con stage_index, prompt_md, hidden_count y visible_tests.`;
+    "- La única etapa debe incluir: stage_index, prompt_md, hidden_count y visible_tests.";
 }

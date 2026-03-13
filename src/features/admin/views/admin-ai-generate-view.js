@@ -7,7 +7,6 @@ import {
   MAX_BATCH_COUNT,
   MAX_UNIQUE_ATTEMPTS,
   clampInt,
-  normalizeStagesMode,
 } from "./admin-ai-generate/constants.js";
 import { resolveDifficultyPlan } from "./admin-ai-generate/difficulty-plan.js";
 import { detectDuplicateReason } from "./admin-ai-generate/duplicate-utils.js";
@@ -32,8 +31,6 @@ export async function adminAiGenerateView(container) {
     error: null,
     lastPrompt: "",
     batchCount: DEFAULT_BATCH_COUNT,
-    stagesMode: "auto",
-    customStageCount: 3,
     generatedProblem: null,
     generatedBatch: [],
     savedProblemId: null,
@@ -71,18 +68,14 @@ export async function adminAiGenerateView(container) {
         if (prompt.length < 10) throw new Error("El prompt debe tener al menos 10 caracteres.");
 
         const adminBatchCount = clampInt(formData.get("batch_count"), DEFAULT_BATCH_COUNT, 1, MAX_BATCH_COUNT);
-        const stagesMode = normalizeStagesMode(formData.get("stages_mode"));
-        const customStageCount = clampInt(formData.get("custom_stage_count"), 3, 1, 20);
         const promptBatchCount = detectPromptExerciseCount(prompt);
         const batchCount = promptBatchCount ?? adminBatchCount;
         const difficultySignals = detectPromptDifficultySignals(prompt);
         const difficultyPlan = resolveDifficultyPlan(batchCount, difficultySignals);
-        const stageInstruction = resolveStageInstruction(prompt, stagesMode, customStageCount);
+        const stageInstruction = resolveStageInstruction();
 
         state.lastPrompt = prompt;
         state.batchCount = batchCount;
-        state.stagesMode = stagesMode;
-        state.customStageCount = customStageCount;
         state.isGenerating = true;
         state.generationCurrent = 0;
         state.generationTotal = batchCount;

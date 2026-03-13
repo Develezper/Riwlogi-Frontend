@@ -18,7 +18,7 @@ export async function problemsHomeView(container) {
           Desafíos <span class="text-brand">Riw</span>log
         </h1>
         <p class="text-zinc-400 text-lg max-w-2xl mx-auto">
-          Resuelve problemas por etapas y demuestra tu proceso, no solo el resultado final.
+          Resuelve problemas en una etapa única y demuestra tu proceso, no solo el resultado final.
         </p>
       </div>
 

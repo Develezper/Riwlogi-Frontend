@@ -110,10 +110,10 @@ function buildEditFormHtml(problem) {
       </div>
 
       <div>
-        <label class="block text-xs text-zinc-400 mb-2">Etapas y tests</label>
+        <label class="block text-xs text-zinc-400 mb-2">Etapa única y tests</label>
         ${stagesEditor}
         <p class="text-[11px] text-zinc-500 mt-2">
-          Cada etapa se guarda con: <code class="text-zinc-400">stage_index</code>, <code class="text-zinc-400">prompt_md</code>, <code class="text-zinc-400">hidden_count</code> y <code class="text-zinc-400">visible_tests</code>.
+          La etapa se guarda con: <code class="text-zinc-400">stage_index</code>, <code class="text-zinc-400">prompt_md</code>, <code class="text-zinc-400">hidden_count</code> y <code class="text-zinc-400">visible_tests</code>.
         </p>
       </div>
 
@@ -175,7 +175,7 @@ export function renderPromptPhase(container, state) {
       <div>
         <h1 class="text-2xl font-bold text-zinc-100">Generación de ejercicios con IA</h1>
         <p class="text-zinc-400 text-sm mt-1">
-          El prompt tiene prioridad. Si no define cantidad, dificultad o etapas, se usan los valores configurados abajo.
+          El prompt tiene prioridad. Si no define cantidad o dificultad, se usan los valores configurados abajo.
         </p>
       </div>
 
@@ -196,7 +196,7 @@ export function renderPromptPhase(container, state) {
             placeholder="Ejemplo: Crea ejercicios sobre arrays y two pointers para práctica técnica en entrevistas."
           >${escapeHtml(state.lastPrompt || "")}</textarea>
 
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
             <div>
               <label class="block text-xs text-zinc-400 mb-1">Cantidad de ejercicios</label>
               <input
@@ -211,32 +211,16 @@ export function renderPromptPhase(container, state) {
             </div>
 
             <div>
-              <label class="block text-xs text-zinc-400 mb-1">Etapas por ejercicio</label>
-              <select
-                name="stages_mode"
-                ${disabledAttr}
-                class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition">
-                <option value="auto" ${state.stagesMode === "auto" ? "selected" : ""}>Auto IA (decide 2 o 3)</option>
-                <option value="custom" ${state.stagesMode === "custom" ? "selected" : ""}>Personalizado</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-xs text-zinc-400 mb-1">Etapas personalizadas</label>
-              <input
-                type="number"
-                name="custom_stage_count"
-                min="1"
-                max="20"
-                ${disabledAttr}
-                value="${escapeHtml(String(state.customStageCount || 3))}"
-                class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
-              <p class="text-[11px] text-zinc-500 mt-1">Solo se usa con modo "Personalizado".</p>
+              <label class="block text-xs text-zinc-400 mb-1">Modelo de etapas</label>
+              <div class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-300">
+                Etapa única (fijo)
+              </div>
+              <p class="text-[11px] text-zinc-500 mt-1">Todos los ejercicios se generan con una sola etapa.</p>
             </div>
           </div>
 
           <p class="mt-3 text-xs text-zinc-500">
-            El sistema genera título, dificultad, etiquetas, enunciado, starter code y etapas con tests visibles.
+            El sistema genera título, dificultad, etiquetas, enunciado, starter code y una etapa con tests visibles.
           </p>
 
           <div class="flex justify-end mt-4">

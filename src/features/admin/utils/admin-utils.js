@@ -94,17 +94,20 @@ export function roleLabel(role, isAdmin) {
 
 export function stageEditorJson(problem) {
   const stages = Array.isArray(problem?.stages) ? problem.stages : [];
-  const payload = stages.map((stage) => ({
-    stage_index: Number(stage.stage_index || 1),
-    prompt_md: String(stage.prompt_md || ""),
-    hidden_count: Number(stage.hidden_count || 0),
-    visible_tests: Array.isArray(stage.visible_tests)
-      ? stage.visible_tests.map((test) => ({
-          input_text: String(test.input_text || ""),
-          expected_text: String(test.expected_text || ""),
-        }))
-      : [],
-  }));
+  const firstStage = stages[0] || {};
+  const payload = [
+    {
+      stage_index: 1,
+      prompt_md: String(firstStage.prompt_md || ""),
+      hidden_count: Number(firstStage.hidden_count || 0),
+      visible_tests: Array.isArray(firstStage.visible_tests)
+        ? firstStage.visible_tests.map((test) => ({
+            input_text: String(test.input_text || ""),
+            expected_text: String(test.expected_text || ""),
+          }))
+        : [],
+    },
+  ];
   return JSON.stringify(payload, null, 2);
 }
 

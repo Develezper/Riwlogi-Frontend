@@ -25,7 +25,7 @@ test("auth flow unlocks protected profile route", async ({ page }) => {
   await expect(page.getByText(/Recent Submissions/i)).toBeVisible();
 });
 
-test("solver can run and submit stages", async ({ page }) => {
+test("solver can run and submit in single-stage mode", async ({ page }) => {
   await login(page);
 
   await page.goto("/#/problem/two-sum");

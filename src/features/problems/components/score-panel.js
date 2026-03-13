@@ -95,7 +95,7 @@ export function scorePanel(view = null, isRunning = false) {
 
   const meta = [];
   if (Number.isFinite(view.runtime_ms)) meta.push(`⏱ ${view.runtime_ms}ms`);
-  if (view.stage_index) meta.push(`Etapa ${view.stage_index}`);
+  if (view.stage_index) meta.push("Etapa única");
 
   return `
     <div class="p-4 bg-zinc-900 rounded-lg border border-zinc-800 space-y-3">

@@ -1,4 +1,3 @@
-import { stageBar } from "../components/stage-bar.js";
 import { scorePanel } from "../components/score-panel.js";
 import { api } from "../../../shared/services/api/index.js";
 import { EditorTracker } from "../services/editor-tracker.js";
@@ -8,7 +7,6 @@ export async function problemSolverView(container, { slug }) {
   const state = {
     problem: null,
     stages: [],
-    activeStageIndex: 0,
     stageResults: {},
     lastAction: null,
     lastSecurityCheck: null,
@@ -82,7 +80,6 @@ export async function problemSolverView(container, { slug }) {
     bindEvents(container, state);
     updatePanelVisibility(container, state);
     updateStageContent(container, state);
-    updateStageBar(container, state);
     updateCasesPanel(container, state);
     updateResultsPanel(container, state);
   } catch (error) {
@@ -120,10 +117,7 @@ function renderLayout(container, state) {
           <h1 class="font-semibold text-white">${state.problem.title}</h1>
           <span class="px-2 py-0.5 rounded-full text-xs font-medium ${badge.class}">${badge.label}</span>
           </div>
-          <div class="flex items-center gap-3">
-            <span class="text-xs uppercase tracking-wide text-zinc-500">Etapas</span>
-            <div id="stage-bar-container" class="max-w-full"></div>
-          </div>
+          <span class="px-2 py-0.5 rounded-full text-xs font-medium text-sky-200 bg-sky-500/10 border border-sky-500/30">Etapa única</span>
         </div>
       </div>
 
@@ -205,7 +199,6 @@ function bindEvents(container, state) {
   const resetButton = container.querySelector("#btn-reset");
   const clearConsoleButton = container.querySelector("#btn-clear-console");
   const languageSelect = container.querySelector("#lang-select");
-  const stageBarContainer = container.querySelector("#stage-bar-container");
   const tabResults = container.querySelector("#tab-results");
   const tabCases = container.querySelector("#tab-cases");
 
@@ -237,7 +230,6 @@ function bindEvents(container, state) {
         state.lastSecurityCheck = result.classification;
       }
 
-      updateStageBar(container, state);
       updateResultsPanel(
         container,
         state,
@@ -291,7 +283,6 @@ function bindEvents(container, state) {
       await api.submissions.submit(state.submissionId);
 
       state.lastSecurityCheck = security;
-      updateStageBar(container, state);
       updateResultsPanel(container, state, { mode: "submit", security }, false);
       showToast("Envío registrado. Revisa las validaciones de seguridad.", "success", 5000);
     } catch (error) {
@@ -312,7 +303,6 @@ function bindEvents(container, state) {
     }
 
     state.lastAction = "run";
-    updateStageBar(container, state);
     updateResultsPanel(container, state);
     showToast("Consola limpiada", "info");
   };
@@ -342,30 +332,11 @@ function bindEvents(container, state) {
         state,
         getInitialCodeForLanguage(state.problem, state.language),
       );
-      updateStageBar(container, state);
       updateResultsPanel(container, state);
       showToast(`Lenguaje cambiado a ${languageLabel(state.language)}`, "info");
     } catch (error) {
       showToast(error.message, "error");
     }
-  };
-
-  const onStageClick = (event) => {
-    const stageButton = event.target.closest("[data-stage-index]");
-    if (!stageButton) return;
-    if (stageButton.dataset.stageActive !== "true") return;
-
-    const stageIndex = Number(stageButton.dataset.stageIndex) - 1;
-    if (stageIndex < 0 || stageIndex >= state.stages.length) return;
-
-    state.activeStageIndex = stageIndex;
-    const stage = getActiveStage(state);
-    state.tracker?.setStage(stage?.id);
-
-    updateStageBar(container, state);
-    updateStageContent(container, state);
-    updateResultsPanel(container, state);
-    updateCasesPanel(container, state);
   };
 
   const onTabClick = (event) => {
@@ -379,7 +350,6 @@ function bindEvents(container, state) {
   clearConsoleButton?.addEventListener("click", onClearConsole);
   resetButton?.addEventListener("click", onReset);
   languageSelect?.addEventListener("change", onLanguageChange);
-  stageBarContainer?.addEventListener("click", onStageClick);
   tabResults?.addEventListener("click", onTabClick);
   tabCases?.addEventListener("click", onTabClick);
 
@@ -388,7 +358,6 @@ function bindEvents(container, state) {
   state.cleanupFns.push(() => clearConsoleButton?.removeEventListener("click", onClearConsole));
   state.cleanupFns.push(() => resetButton?.removeEventListener("click", onReset));
   state.cleanupFns.push(() => languageSelect?.removeEventListener("change", onLanguageChange));
-  state.cleanupFns.push(() => stageBarContainer?.removeEventListener("click", onStageClick));
   state.cleanupFns.push(() => tabResults?.removeEventListener("click", onTabClick));
   state.cleanupFns.push(() => tabCases?.removeEventListener("click", onTabClick));
 }
@@ -574,12 +543,6 @@ function replaceEditorCode(container, state, code) {
   }
 }
 
-function updateStageBar(container, state) {
-  const stageContainer = container.querySelector("#stage-bar-container");
-  if (!stageContainer) return;
-  stageContainer.innerHTML = stageBar(state.stages, state.activeStageIndex + 1, state.stageResults, 3);
-}
-
 function updateStageContent(container, state) {
   const statement = container.querySelector("#problem-statement");
   const examples = container.querySelector("#problem-examples");
@@ -643,7 +606,7 @@ function updateCasesPanel(container, state) {
   const tests = stage?.visible_tests || [];
 
   if (!tests.length) {
-    panel.innerHTML = `<p class="text-sm text-zinc-500">No hay casos de prueba visibles para esta etapa.</p>`;
+    panel.innerHTML = `<p class="text-sm text-zinc-500">No hay casos de prueba visibles para este ejercicio.</p>`;
     return;
   }
 
@@ -705,7 +668,7 @@ function setButtonsDisabled(container, disabled, mode = "run") {
 }
 
 function getActiveStage(state) {
-  return state.stages[state.activeStageIndex] || null;
+  return state.stages[0] || null;
 }
 
 function clearEditorBindings(state) {
@@ -786,14 +749,9 @@ function renderTags(tags) {
 }
 
 function collectExampleTests(stages, limit = 3) {
-  const examples = [];
-  for (const stage of stages || []) {
-    for (const test of stage.visible_tests || []) {
-      examples.push(test);
-      if (examples.length >= limit) return examples;
-    }
-  }
-  return examples;
+  const firstStage = Array.isArray(stages) ? stages[0] : null;
+  const tests = Array.isArray(firstStage?.visible_tests) ? firstStage.visible_tests : [];
+  return tests.slice(0, limit);
 }
 
 function renderExamples(examples) {

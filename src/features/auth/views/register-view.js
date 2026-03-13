@@ -14,7 +14,7 @@ export function registerView(container) {
       <div class="w-full max-w-sm p-8 bg-zinc-900/60 border border-zinc-800 rounded-2xl">
         <div class="text-center mb-8">
           <h1 class="text-2xl font-bold text-white mb-2">Crear cuenta</h1>
-          <p class="text-zinc-400 text-sm">Empieza a competir por etapas hoy.</p>
+          <p class="text-zinc-400 text-sm">Empieza a competir con ejercicios de etapa única.</p>
         </div>
 
         <form id="register-form" class="space-y-4" novalidate>

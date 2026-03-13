@@ -31,7 +31,7 @@ export function problemCard(problem) {
 
       <div class="flex items-center justify-between text-xs text-zinc-500">
         <span>${Number(problem.acceptance || 0).toFixed(1)}% de aceptación</span>
-        <span>${problem.stages_count} etapas</span>
+        <span>Etapa única</span>
       </div>
     </a>
   `;

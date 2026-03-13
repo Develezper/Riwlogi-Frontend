@@ -14,7 +14,7 @@ export function loginView(container) {
       <div class="w-full max-w-sm p-8 bg-zinc-900/60 border border-zinc-800 rounded-2xl">
         <div class="text-center mb-8">
           <h1 class="text-2xl font-bold text-white mb-2">Iniciar sesión</h1>
-          <p class="text-zinc-400 text-sm">Usa tu cuenta para continuar resolviendo etapas.</p>
+          <p class="text-zinc-400 text-sm">Usa tu cuenta para continuar resolviendo ejercicios.</p>
         </div>
 
         <form id="login-form" class="space-y-4" novalidate>

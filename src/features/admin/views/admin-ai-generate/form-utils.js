@@ -21,10 +21,28 @@ function parseStagesJsonValue(rawValue) {
   return parsed;
 }
 
+function normalizeSingleStage(rawStages) {
+  const stages = Array.isArray(rawStages) ? rawStages : [];
+  const firstStage = stages[0] || {};
+  return {
+    stage_index: 1,
+    prompt_md: String(firstStage.prompt_md || "").trim(),
+    hidden_count: Math.max(0, Number.parseInt(String(firstStage.hidden_count ?? 0), 10) || 0),
+    visible_tests: Array.isArray(firstStage.visible_tests)
+      ? firstStage.visible_tests
+          .map((test) => ({
+            input_text: String(test?.input_text || "").trim(),
+            expected_text: String(test?.expected_text || "").trim(),
+          }))
+          .filter((test) => test.input_text || test.expected_text)
+      : [],
+  };
+}
+
 export function buildProblemDraftFromForm(form, baseProblem) {
   syncStageEditorJsonField(form);
   const formData = new FormData(form);
-  const stages = parseStagesJsonValue(formData.get("stages_json"));
+  const stages = [normalizeSingleStage(parseStagesJsonValue(formData.get("stages_json")))];
 
   return {
     ...baseProblem,
@@ -40,7 +58,7 @@ export function buildProblemDraftFromForm(form, baseProblem) {
       javascript: String(formData.get("starter_javascript") || "").trimEnd(),
     },
     stages,
-    stages_count: stages.length,
+    stages_count: 1,
     source: "ai",
   };
 }
