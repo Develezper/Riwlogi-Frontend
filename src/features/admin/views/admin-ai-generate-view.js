@@ -12,6 +12,32 @@ import {
 
 const DEFAULT_BATCH_COUNT = 3;
 const MAX_BATCH_COUNT = 12;
+const MAX_UNIQUE_ATTEMPTS = 4;
+const MAX_UNIQUE_TITLE_REFERENCES = 6;
+const NUMBER_WORDS = Object.freeze({
+  un: 1,
+  una: 1,
+  uno: 1,
+  dos: 2,
+  tres: 3,
+  cuatro: 4,
+  cinco: 5,
+  seis: 6,
+  siete: 7,
+  ocho: 8,
+  nueve: 9,
+  diez: 10,
+  once: 11,
+  doce: 12,
+  trece: 13,
+  catorce: 14,
+  quince: 15,
+  dieciseis: 16,
+  diecisiete: 17,
+  dieciocho: 18,
+  diecinueve: 19,
+  veinte: 20,
+});
 
 function clampInt(value, fallback, min, max) {
   const parsed = Number.parseInt(String(value ?? "").trim(), 10);
@@ -34,19 +60,37 @@ function normalizePromptText(value) {
     .trim();
 }
 
+function parsePromptCountToken(token, fallback, min, max) {
+  const clean = String(token || "").trim().toLowerCase();
+  if (!clean) return null;
+
+  if (/^\d{1,2}$/.test(clean)) {
+    return clampInt(clean, fallback, min, max);
+  }
+
+  const fromWords = NUMBER_WORDS[clean];
+  if (!fromWords) return null;
+  return clampInt(fromWords, fallback, min, max);
+}
+
 function detectPromptExerciseCount(prompt) {
   const text = normalizePromptText(prompt);
   if (!text) return null;
 
+  const exerciseNoun = "(?:ejercicios?|ejercios?|ejercicos?|ejercicios?|problemas?|retos?|challenges?)";
   const patterns = [
-    /\b(?:crear|crea|genera|generar|haz|hacer|necesito|quiero|dame|con)\s*(\d{1,2})\s*(?:ejercicios|problemas|retos|challenges?)\b/i,
-    /\b(\d{1,2})\s*(?:ejercicios|problemas|retos|challenges?)\b/i,
+    new RegExp(
+      `\\b(?:crear|crea|genera|generar|haz|hacer|necesito|quiero|dame|con)\\s*(\\d{1,2}|[a-z]+)\\s*${exerciseNoun}\\b`,
+      "i",
+    ),
+    new RegExp(`\\b(\\d{1,2}|[a-z]+)\\s*${exerciseNoun}\\b`, "i"),
   ];
 
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (!match?.[1]) continue;
-    return clampInt(match[1], DEFAULT_BATCH_COUNT, 1, MAX_BATCH_COUNT);
+    const parsed = parsePromptCountToken(match[1], DEFAULT_BATCH_COUNT, 1, MAX_BATCH_COUNT);
+    if (parsed !== null) return parsed;
   }
 
   return null;
@@ -56,18 +100,44 @@ function detectPromptStageCount(prompt) {
   const text = normalizePromptText(prompt);
   if (!text) return null;
 
+  const stageNoun = "(?:etapas?|etpas?|stages?)";
   const patterns = [
-    /\b(?:con|de)?\s*(\d{1,2})\s*(?:etapas|stages?)\b/i,
-    /\b(?:etapas|stages?)\s*[:=]?\s*(\d{1,2})\b/i,
+    new RegExp(`\\b(?:con|de)?\\s*(\\d{1,2}|[a-z]+)\\s*${stageNoun}\\b`, "i"),
+    new RegExp(`\\b${stageNoun}\\s*[:=]?\\s*(\\d{1,2}|[a-z]+)\\b`, "i"),
   ];
 
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (!match?.[1]) continue;
-    return clampInt(match[1], 3, 1, 20);
+    const parsed = parsePromptCountToken(match[1], 3, 1, 20);
+    if (parsed !== null) return parsed;
   }
 
   return null;
+}
+
+function detectDifficultyQuotaCount(text, difficultyPattern) {
+  const patterns = [
+    new RegExp(`\\b(\\d{1,2}|[a-z]+)\\s*(?:de\\s+)?${difficultyPattern}\\b`, "gi"),
+    new RegExp(`\\b${difficultyPattern}\\s*[:=]?\\s*(\\d{1,2}|[a-z]+)\\b`, "gi"),
+  ];
+
+  let total = 0;
+  let hasAny = false;
+
+  for (const pattern of patterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      if (!match?.[1]) continue;
+      const parsed = parsePromptCountToken(match[1], 1, 1, MAX_BATCH_COUNT);
+      if (parsed === null) continue;
+      total += parsed;
+      hasAny = true;
+    }
+  }
+
+  if (!hasAny) return null;
+  return total;
 }
 
 function detectPromptDifficultySignals(prompt) {
@@ -76,29 +146,69 @@ function detectPromptDifficultySignals(prompt) {
     return {
       forcedLevel: null,
       hasDifficultyHint: false,
+      quotas: null,
     };
   }
 
   const hasEasy = /\b(facil(?:es)?|easy)\b/i.test(text);
   const hasMedium = /\b(intermedio(?:s)?|medio(?:s)?|medium)\b/i.test(text);
-  const hasHard = /\b(dificil(?:es)?|hard)\b/i.test(text);
+  const hasHard = /\b(dific\w*|hard)\b/i.test(text);
   const hasDifficultyHint = hasEasy || hasMedium || hasHard;
+  const easyQuota = detectDifficultyQuotaCount(text, "(?:facil(?:es)?|easy)");
+  const mediumQuota = detectDifficultyQuotaCount(text, "(?:intermedio(?:s)?|medio(?:s)?|medium)");
+  const hardQuota = detectDifficultyQuotaCount(text, "(?:dific\\w*|hard)");
+  const quotaEntries = [
+    [1, easyQuota],
+    [2, mediumQuota],
+    [3, hardQuota],
+  ].filter(([, value]) => Number.isFinite(value) && Number(value) > 0);
+
+  if (quotaEntries.length > 0) {
+    return {
+      forcedLevel: null,
+      hasDifficultyHint: true,
+      quotas: Object.fromEntries(quotaEntries),
+    };
+  }
+
+  const asksAllHard =
+    /(?:\btodos?\b|\btodas?\b).{0,24}\b(dific\w*|hard)\b/i.test(text) ||
+    /\b(dific\w*|hard)\b.{0,24}(?:\btodos?\b|\btodas?\b)/i.test(text);
+  const asksAllEasy =
+    /(?:\btodos?\b|\btodas?\b).{0,24}\b(facil(?:es)?|easy)\b/i.test(text) ||
+    /\b(facil(?:es)?|easy)\b.{0,24}(?:\btodos?\b|\btodas?\b)/i.test(text);
+  const asksAllMedium =
+    /(?:\btodos?\b|\btodas?\b).{0,24}\b(intermedio(?:s)?|medio(?:s)?|medium)\b/i.test(text) ||
+    /\b(intermedio(?:s)?|medio(?:s)?|medium)\b.{0,24}(?:\btodos?\b|\btodas?\b)/i.test(text);
+
+  if (asksAllHard && !asksAllEasy && !asksAllMedium) {
+    return { forcedLevel: 3, hasDifficultyHint: true, quotas: null };
+  }
+
+  if (asksAllEasy && !asksAllHard && !asksAllMedium) {
+    return { forcedLevel: 1, hasDifficultyHint: true, quotas: null };
+  }
+
+  if (asksAllMedium && !asksAllHard && !asksAllEasy) {
+    return { forcedLevel: 2, hasDifficultyHint: true, quotas: null };
+  }
 
   if (hasHard && !hasEasy && !hasMedium) {
-    return { forcedLevel: 3, hasDifficultyHint: true };
+    return { forcedLevel: 3, hasDifficultyHint: true, quotas: null };
   }
 
   if (hasEasy && !hasHard && !hasMedium) {
-    return { forcedLevel: 1, hasDifficultyHint: true };
+    return { forcedLevel: 1, hasDifficultyHint: true, quotas: null };
   }
 
   if (hasMedium && !hasHard && !hasEasy) {
-    return { forcedLevel: 2, hasDifficultyHint: true };
+    return { forcedLevel: 2, hasDifficultyHint: true, quotas: null };
   }
 
   return {
     forcedLevel: null,
     hasDifficultyHint,
+    quotas: null,
   };
 }
 
@@ -118,6 +228,154 @@ function buildDifficultyPlan(total, forcedLevel = null) {
     plan.push(level);
   }
   return plan;
+}
+
+function planLevelCounts(plan) {
+  const counts = { 1: 0, 2: 0, 3: 0 };
+  for (const level of plan) {
+    const safe = Number(level);
+    if ([1, 2, 3].includes(safe)) counts[safe] += 1;
+  }
+  return counts;
+}
+
+function toSafeQuotaCount(value, maxValue) {
+  const parsed = Number.parseInt(String(value ?? "").trim(), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  return Math.max(0, Math.min(maxValue, parsed));
+}
+
+function allocateWeightedCounts(remaining, levels, weightsByLevel) {
+  const allocation = Object.fromEntries(levels.map((level) => [level, 0]));
+  if (remaining <= 0 || !levels.length) return allocation;
+
+  const normalizedWeights = levels.map((level) => {
+    const value = Number(weightsByLevel?.[level] || 0);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  });
+  const totalWeight = normalizedWeights.reduce((sum, value) => sum + value, 0);
+  const safeTotalWeight = totalWeight > 0 ? totalWeight : levels.length;
+
+  const remainders = [];
+  let assigned = 0;
+  for (let index = 0; index < levels.length; index += 1) {
+    const level = levels[index];
+    const weight = totalWeight > 0 ? normalizedWeights[index] : 1;
+    const exact = (remaining * weight) / safeTotalWeight;
+    const base = Math.floor(exact);
+    allocation[level] = base;
+    assigned += base;
+    remainders.push({ level, frac: exact - base });
+  }
+
+  remainders.sort((left, right) => {
+    if (right.frac !== left.frac) return right.frac - left.frac;
+    return left.level - right.level;
+  });
+
+  let pointer = 0;
+  while (assigned < remaining && remainders.length > 0) {
+    const entry = remainders[pointer % remainders.length];
+    allocation[entry.level] += 1;
+    assigned += 1;
+    pointer += 1;
+  }
+
+  return allocation;
+}
+
+function buildDifficultyPlanFromQuotas(total, quotas) {
+  const count = clampInt(total, DEFAULT_BATCH_COUNT, 1, MAX_BATCH_COUNT);
+  const cleaned = {
+    1: toSafeQuotaCount(quotas?.[1], count),
+    2: toSafeQuotaCount(quotas?.[2], count),
+    3: toSafeQuotaCount(quotas?.[3], count),
+  };
+
+  let specifiedTotal = cleaned[1] + cleaned[2] + cleaned[3];
+  if (specifiedTotal > count) {
+    const scaled = { 1: 0, 2: 0, 3: 0 };
+    const remainders = [];
+
+    for (const level of [1, 2, 3]) {
+      if (!cleaned[level]) continue;
+      const exact = (cleaned[level] * count) / specifiedTotal;
+      const base = Math.floor(exact);
+      scaled[level] = base;
+      remainders.push({ level, frac: exact - base, original: cleaned[level] });
+    }
+
+    let assigned = scaled[1] + scaled[2] + scaled[3];
+    remainders.sort((left, right) => {
+      if (right.frac !== left.frac) return right.frac - left.frac;
+      if (right.original !== left.original) return right.original - left.original;
+      return left.level - right.level;
+    });
+
+    let pointer = 0;
+    while (assigned < count && remainders.length > 0) {
+      const entry = remainders[pointer % remainders.length];
+      scaled[entry.level] += 1;
+      assigned += 1;
+      pointer += 1;
+    }
+
+    cleaned[1] = scaled[1];
+    cleaned[2] = scaled[2];
+    cleaned[3] = scaled[3];
+    specifiedTotal = count;
+  }
+
+  if (specifiedTotal < count) {
+    const remaining = count - specifiedTotal;
+    const defaultCounts = planLevelCounts(buildDifficultyPlan(count));
+    const hasEasy = cleaned[1] > 0;
+    const hasMedium = cleaned[2] > 0;
+    const hasHard = cleaned[3] > 0;
+    const unspecifiedLevels = [1, 2, 3].filter((level) => {
+      if (level === 1) return !hasEasy;
+      if (level === 2) return !hasMedium;
+      return !hasHard;
+    });
+    const levelsToFill = unspecifiedLevels.length ? unspecifiedLevels : [2];
+    const additional = allocateWeightedCounts(remaining, levelsToFill, defaultCounts);
+    cleaned[1] += additional[1] || 0;
+    cleaned[2] += additional[2] || 0;
+    cleaned[3] += additional[3] || 0;
+  }
+
+  const plan = [];
+  for (const level of [1, 2, 3]) {
+    for (let index = 0; index < cleaned[level]; index += 1) {
+      plan.push(level);
+    }
+  }
+
+  if (plan.length < count) {
+    while (plan.length < count) plan.push(2);
+  } else if (plan.length > count) {
+    plan.length = count;
+  }
+
+  return plan;
+}
+
+function resolveDifficultyPlan(total, difficultySignals) {
+  const count = clampInt(total, DEFAULT_BATCH_COUNT, 1, MAX_BATCH_COUNT);
+  const forcedLevel = Number(difficultySignals?.forcedLevel);
+  const quotas = difficultySignals?.quotas;
+  const hasDifficultyHint = Boolean(difficultySignals?.hasDifficultyHint);
+
+  if (quotas && Object.keys(quotas).length > 0) {
+    return buildDifficultyPlanFromQuotas(count, quotas);
+  }
+
+  if ([1, 2, 3].includes(forcedLevel)) {
+    return buildDifficultyPlan(count, forcedLevel);
+  }
+
+  if (hasDifficultyHint) return null;
+  return buildDifficultyPlan(count);
 }
 
 function difficultyPromptLabel(level) {
@@ -142,6 +400,76 @@ function resolveStageInstruction(prompt, stagesMode, customStageCount) {
   return buildStageInstruction(stagesMode, customStageCount);
 }
 
+function normalizeComparableText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function normalizeStatementSignature(statement) {
+  return normalizeComparableText(statement)
+    .replace(/\b(example|ejemplo|input|output|entrada|salida)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 280);
+}
+
+function detectDuplicateReason(problem, existingProblems) {
+  const list = Array.isArray(existingProblems) ? existingProblems : [];
+  if (!list.length) return null;
+
+  const candidateTitle = normalizeComparableText(problem?.title);
+  const candidateStatement = normalizeStatementSignature(problem?.statement_md);
+
+  for (const existing of list) {
+    const existingTitle = normalizeComparableText(existing?.title);
+    const existingStatement = normalizeStatementSignature(existing?.statement_md);
+
+    if (candidateTitle && existingTitle && candidateTitle === existingTitle) {
+      return "titulo";
+    }
+
+    if (
+      candidateStatement &&
+      existingStatement &&
+      candidateStatement.length >= 80 &&
+      existingStatement.length >= 80 &&
+      candidateStatement === existingStatement
+    ) {
+      return "enunciado";
+    }
+  }
+
+  return null;
+}
+
+function buildUniquenessInstruction(existingProblems, attempt = 1) {
+  const list = Array.isArray(existingProblems) ? existingProblems : [];
+  const titles = list
+    .map((problem) => String(problem?.title || "").trim())
+    .filter(Boolean)
+    .slice(-MAX_UNIQUE_TITLE_REFERENCES);
+
+  const strongRetryInstruction =
+    attempt > 1
+      ? `\n- Reintento por duplicado (${attempt}/${MAX_UNIQUE_ATTEMPTS}): cambia enfoque, contexto y título para que sea claramente distinto.`
+      : "";
+
+  const titleGuard = titles.length
+    ? `\n- No repitas ni variantes de estos títulos ya generados: ${titles.join(" | ")}.`
+    : "";
+
+  return (
+    `\n- Debe ser único frente al lote en título, enunciado y enfoque de solución.` +
+    `\n- Si el tema es el mismo, usa una mecánica distinta (objetivo, restricciones o estructura de datos).` +
+    titleGuard +
+    strongRetryInstruction
+  );
+}
+
 function buildGenerationPrompt({
   basePrompt,
   batchIndex,
@@ -149,12 +477,15 @@ function buildGenerationPrompt({
   difficulty,
   difficultyFromPrompt = false,
   stageInstruction,
+  existingProblems = [],
+  attempt = 1,
 }) {
   const difficultyInstruction = difficulty
     ? `- Dificultad objetivo: ${difficultyPromptLabel(difficulty)} (${difficulty}).`
     : difficultyFromPrompt
       ? "- Respeta la dificultad indicada en el prompt base."
       : "- Dificultad objetivo: Intermedio (2).";
+  const uniquenessInstruction = buildUniquenessInstruction(existingProblems, attempt);
 
   return `${basePrompt}\n\n` +
     `Instrucciones internas para esta generación:\n` +
@@ -162,6 +493,7 @@ function buildGenerationPrompt({
     `- Este es el ejercicio ${batchIndex + 1} de ${batchCount}.\n` +
     `${difficultyInstruction}\n` +
     `- ${stageInstruction}\n` +
+    `${uniquenessInstruction}\n` +
     `- Las etapas deben ser consecutivas y cada una con stage_index, prompt_md, hidden_count y visible_tests.`;
 }
 
@@ -379,7 +711,44 @@ function buildEditFormHtml(problem) {
   `;
 }
 
+function buildGenerationLoadingHtml(state) {
+  if (!state.isGenerating) return "";
+
+  const total = Math.max(1, Number(state.generationTotal || 0));
+  const current = Math.max(0, Number(state.generationCurrent || 0));
+  const percent = Math.max(0, Math.min(100, Math.round((current / total) * 100)));
+  const message = state.generationMessage || "Preparando generación…";
+
+  return `
+    <div class="rounded-xl border border-brand/40 bg-brand/10 p-4 animate-fade-in">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-6 h-6 border-2 border-brand/40 border-t-brand rounded-full animate-spin"></div>
+          <div>
+            <p class="text-sm font-semibold text-zinc-100">Creando ejercicios con IA…</p>
+            <p class="text-xs text-zinc-300 mt-0.5">${escapeHtml(message)}</p>
+          </div>
+        </div>
+        <span class="text-xs text-brand font-semibold">${current}/${total}</span>
+      </div>
+
+      <div class="mt-3 h-2 rounded-full bg-zinc-800 overflow-hidden">
+        <div class="h-full rounded-full bg-brand ai-gen-progress-fill" style="width:${percent}%"></div>
+      </div>
+
+      <div class="mt-3 flex items-center gap-1.5 text-zinc-300 text-xs">
+        <span class="ai-dot w-1.5 h-1.5 rounded-full bg-brand"></span>
+        <span class="ai-dot w-1.5 h-1.5 rounded-full bg-brand"></span>
+        <span class="ai-dot w-1.5 h-1.5 rounded-full bg-brand"></span>
+        <span class="ml-1">Esto puede tardar unos segundos por ejercicio.</span>
+      </div>
+    </div>
+  `;
+}
+
 function renderPromptPhase(container, state) {
+  const disabledAttr = state.isGenerating ? "disabled" : "";
+
   container.innerHTML = `
     ${adminNav("generate")}
     <section class="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -391,6 +760,7 @@ function renderPromptPhase(container, state) {
       </div>
 
       ${state.error ? `<div class="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">${escapeHtml(state.error)}</div>` : ""}
+      ${buildGenerationLoadingHtml(state)}
 
       <div class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
         <form id="generate-ai-form" novalidate>
@@ -401,6 +771,7 @@ function renderPromptPhase(container, state) {
             rows="8"
             required
             minlength="10"
+            ${disabledAttr}
             class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition resize-none"
             placeholder="Ejemplo: Crea ejercicios sobre arrays y two pointers para práctica técnica en entrevistas."
           >${escapeHtml(state.lastPrompt || "")}</textarea>
@@ -413,6 +784,7 @@ function renderPromptPhase(container, state) {
                 name="batch_count"
                 min="1"
                 max="${MAX_BATCH_COUNT}"
+                ${disabledAttr}
                 value="${escapeHtml(String(state.batchCount || DEFAULT_BATCH_COUNT))}"
                 class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
               <p class="text-[11px] text-zinc-500 mt-1">Default: 3 (fácil, intermedio, difícil).</p>
@@ -422,6 +794,7 @@ function renderPromptPhase(container, state) {
               <label class="block text-xs text-zinc-400 mb-1">Etapas por ejercicio</label>
               <select
                 name="stages_mode"
+                ${disabledAttr}
                 class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition">
                 <option value="auto" ${state.stagesMode === "auto" ? "selected" : ""}>Auto IA (decide 2 o 3)</option>
                 <option value="custom" ${state.stagesMode === "custom" ? "selected" : ""}>Personalizado</option>
@@ -435,6 +808,7 @@ function renderPromptPhase(container, state) {
                 name="custom_stage_count"
                 min="1"
                 max="20"
+                ${disabledAttr}
                 value="${escapeHtml(String(state.customStageCount || 3))}"
                 class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
               <p class="text-[11px] text-zinc-500 mt-1">Solo se usa con modo "Personalizado".</p>
@@ -447,8 +821,9 @@ function renderPromptPhase(container, state) {
 
           <div class="flex justify-end mt-4">
             <button type="submit"
+              ${disabledAttr}
               class="px-6 py-2 rounded-lg bg-brand text-white hover:bg-brand-dark transition text-sm font-medium">
-              Generar con IA
+              ${state.isGenerating ? "Generando…" : "Generar con IA"}
             </button>
           </div>
         </form>
@@ -525,6 +900,10 @@ export async function adminAiGenerateView(container) {
     generatedProblem: null,
     generatedBatch: [],
     savedProblemId: null,
+    isGenerating: false,
+    generationCurrent: 0,
+    generationTotal: 0,
+    generationMessage: "",
   };
 
   let isMounted = true;
@@ -544,9 +923,8 @@ export async function adminAiGenerateView(container) {
     if (!form || form.tagName !== "FORM") return;
 
     if (form.id === "generate-ai-form") {
+      if (state.isGenerating) return;
       event.preventDefault();
-      const submitButton = formButton(form);
-      const releaseButton = setLoadingButton(submitButton, "Generando…");
       state.error = null;
       const createdProblems = [];
 
@@ -560,37 +938,66 @@ export async function adminAiGenerateView(container) {
         const customStageCount = clampInt(formData.get("custom_stage_count"), 3, 1, 20);
         const promptBatchCount = detectPromptExerciseCount(prompt);
         const batchCount = promptBatchCount ?? adminBatchCount;
-        const { forcedLevel, hasDifficultyHint } = detectPromptDifficultySignals(prompt);
-        const difficultyPlan =
-          forcedLevel !== null
-            ? buildDifficultyPlan(batchCount, forcedLevel)
-            : hasDifficultyHint
-              ? null
-              : buildDifficultyPlan(batchCount);
+        const difficultySignals = detectPromptDifficultySignals(prompt);
+        const difficultyPlan = resolveDifficultyPlan(batchCount, difficultySignals);
         const stageInstruction = resolveStageInstruction(prompt, stagesMode, customStageCount);
 
         state.lastPrompt = prompt;
         state.batchCount = batchCount;
         state.stagesMode = stagesMode;
         state.customStageCount = customStageCount;
+        state.isGenerating = true;
+        state.generationCurrent = 0;
+        state.generationTotal = batchCount;
+        state.generationMessage = "Analizando prompt y preparando generación…";
+        render();
 
         for (let index = 0; index < batchCount; index += 1) {
           const difficulty = Array.isArray(difficultyPlan) ? difficultyPlan[index] || 2 : null;
-          const composedPrompt = buildGenerationPrompt({
-            basePrompt: prompt,
-            batchIndex: index,
-            batchCount,
-            difficulty,
-            difficultyFromPrompt: hasDifficultyHint,
-            stageInstruction,
-          });
+          let created = null;
+          let lastDuplicateReason = null;
 
-          if (submitButton) {
-            submitButton.textContent = `Generando ${index + 1}/${batchCount}…`;
+          for (let attempt = 1; attempt <= MAX_UNIQUE_ATTEMPTS; attempt += 1) {
+            const composedPrompt = buildGenerationPrompt({
+              basePrompt: prompt,
+              batchIndex: index,
+              batchCount,
+              difficulty,
+              difficultyFromPrompt: difficultySignals.hasDifficultyHint,
+              stageInstruction,
+              existingProblems: createdProblems,
+              attempt,
+            });
+
+            state.generationCurrent = index;
+            state.generationMessage =
+              attempt === 1
+                ? `Generando ejercicio ${index + 1} de ${batchCount}…`
+                : `Evitando duplicado en ejercicio ${index + 1} (intento ${attempt}/${MAX_UNIQUE_ATTEMPTS})…`;
+            render();
+
+            const candidate = await api.admin.generateProblem({ prompt: composedPrompt });
+            const duplicateReason = detectDuplicateReason(candidate, createdProblems);
+            if (!duplicateReason) {
+              created = candidate;
+              break;
+            }
+
+            lastDuplicateReason = duplicateReason;
           }
 
-          const created = await api.admin.generateProblem({ prompt: composedPrompt });
+          if (!created) {
+            const reasonText = lastDuplicateReason ? ` (${lastDuplicateReason} repetido)` : "";
+            throw new Error(
+              `No se pudo generar un ejercicio único para la posición ${index + 1}${reasonText}. Intenta ajustar el prompt.`,
+            );
+          }
+
           createdProblems.push(created);
+
+          state.generationCurrent = index + 1;
+          state.generationMessage = `Ejercicio ${index + 1} generado correctamente.`;
+          render();
         }
 
         if (!isMounted) return;
@@ -598,6 +1005,10 @@ export async function adminAiGenerateView(container) {
           throw new Error("No se pudo generar ningún ejercicio.");
         }
 
+        state.isGenerating = false;
+        state.generationCurrent = 0;
+        state.generationTotal = 0;
+        state.generationMessage = "";
         state.generatedBatch = createdProblems;
         state.generatedProblem = createdProblems[0];
         state.phase = "edit";
@@ -612,6 +1023,10 @@ export async function adminAiGenerateView(container) {
       } catch (error) {
         if (!isMounted) return;
 
+        state.isGenerating = false;
+        state.generationCurrent = 0;
+        state.generationTotal = 0;
+        state.generationMessage = "";
         if (createdProblems.length > 0) {
           state.generatedBatch = createdProblems;
           state.generatedProblem = createdProblems[0];
@@ -624,8 +1039,6 @@ export async function adminAiGenerateView(container) {
           state.error = error?.message || "No se pudo generar el ejercicio.";
           render();
         }
-      } finally {
-        releaseButton();
       }
       return;
     }
@@ -665,6 +1078,7 @@ export async function adminAiGenerateView(container) {
   const onClick = async (event) => {
     const trigger = event.target.closest("[data-action]");
     if (!trigger || !container.contains(trigger)) return;
+    if (state.isGenerating) return;
 
     const action = trigger.dataset.action;
 
