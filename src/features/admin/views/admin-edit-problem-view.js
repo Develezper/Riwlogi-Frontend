@@ -1,9 +1,9 @@
 import { api } from "../../../shared/services/api/index.js";
 import { escapeHtml, showToast, spinner } from "../../../shared/utils/ui-helpers.js";
 import { adminNav } from "../components/admin-nav.js";
+import { buildStageEditorHtml, handleStageEditorAction, syncStageEditorJsonField } from "../utils/stage-editor.js";
 import {
   formatList,
-  stageEditorJson,
   parseCsv,
   formButton,
   setLoadingButton,
@@ -18,7 +18,7 @@ function buildEditFormHtml(problem) {
   const statement = escapeHtml(problem.statement_md || "");
   const python = escapeHtml(problem.starter_code?.python || "");
   const js = escapeHtml(problem.starter_code?.javascript || "");
-  const stages = escapeHtml(stageEditorJson(problem));
+  const stagesEditor = buildStageEditorHtml(problem.stages);
 
   return `
     <form id="edit-problem-form" class="space-y-4" novalidate>
@@ -80,10 +80,11 @@ function buildEditFormHtml(problem) {
       </div>
 
       <div>
-        <label class="block text-xs text-zinc-400 mb-1">JSON de etapas</label>
-        <textarea name="stages_json" rows="12"
-          class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100 focus:outline-none focus:border-brand transition resize-none">${stages}</textarea>
-        <p class="text-[11px] text-zinc-500 mt-1">Cada etapa debe incluir: <code class="text-zinc-400">stage_index</code>, <code class="text-zinc-400">prompt_md</code>, <code class="text-zinc-400">hidden_count</code>, <code class="text-zinc-400">visible_tests</code>.</p>
+        <label class="block text-xs text-zinc-400 mb-2">Etapas y tests</label>
+        ${stagesEditor}
+        <p class="text-[11px] text-zinc-500 mt-2">
+          Cada etapa se guarda con: <code class="text-zinc-400">stage_index</code>, <code class="text-zinc-400">prompt_md</code>, <code class="text-zinc-400">hidden_count</code> y <code class="text-zinc-400">visible_tests</code>.
+        </p>
       </div>
 
       <div class="flex items-center justify-between pt-2 border-t border-zinc-800">
@@ -191,6 +192,7 @@ export async function adminEditProblemView(container, params = {}) {
     state.error = null;
 
     try {
+      syncStageEditorJsonField(form);
       const formData = new FormData(form);
       const pid = String(formData.get("problem_id") || "").trim();
       if (!pid) throw new Error("ID de problema no encontrado.");
@@ -231,11 +233,17 @@ export async function adminEditProblemView(container, params = {}) {
     }
   };
 
+  const onClick = (event) => {
+    handleStageEditorAction(event);
+  };
+
+  container.addEventListener("click", onClick);
   container.addEventListener("submit", onSubmit);
   await loadProblem();
 
   return () => {
     isMounted = false;
+    container.removeEventListener("click", onClick);
     container.removeEventListener("submit", onSubmit);
   };
 }

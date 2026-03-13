@@ -1,6 +1,7 @@
 import { escapeHtml } from "../../../../shared/utils/ui-helpers.js";
 import { adminNav } from "../../components/admin-nav.js";
-import { difficultyLabel, formatList, stageEditorJson } from "../../utils/admin-utils.js";
+import { difficultyLabel, formatList } from "../../utils/admin-utils.js";
+import { buildStageEditorHtml } from "../../utils/stage-editor.js";
 import { DEFAULT_BATCH_COUNT, MAX_BATCH_COUNT } from "./constants.js";
 
 function buildBatchSelectorHtml(state) {
@@ -47,7 +48,7 @@ function buildEditFormHtml(problem) {
   const statement = escapeHtml(problem.statement_md || "");
   const python = escapeHtml(problem.starter_code?.python || "");
   const js = escapeHtml(problem.starter_code?.javascript || "");
-  const stages = escapeHtml(stageEditorJson(problem));
+  const stagesEditor = buildStageEditorHtml(problem.stages);
 
   return `
     <form id="edit-problem-form" class="space-y-4" novalidate>
@@ -109,10 +110,11 @@ function buildEditFormHtml(problem) {
       </div>
 
       <div>
-        <label class="block text-xs text-zinc-400 mb-1">JSON de etapas</label>
-        <textarea name="stages_json" rows="12"
-          class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100 focus:outline-none focus:border-brand transition resize-none">${stages}</textarea>
-        <p class="text-[11px] text-zinc-500 mt-1">Cada etapa debe incluir: <code class="text-zinc-400">stage_index</code>, <code class="text-zinc-400">prompt_md</code>, <code class="text-zinc-400">hidden_count</code>, <code class="text-zinc-400">visible_tests</code>.</p>
+        <label class="block text-xs text-zinc-400 mb-2">Etapas y tests</label>
+        ${stagesEditor}
+        <p class="text-[11px] text-zinc-500 mt-2">
+          Cada etapa se guarda con: <code class="text-zinc-400">stage_index</code>, <code class="text-zinc-400">prompt_md</code>, <code class="text-zinc-400">hidden_count</code> y <code class="text-zinc-400">visible_tests</code>.
+        </p>
       </div>
 
       <div class="flex items-center justify-between pt-2 border-t border-zinc-800">

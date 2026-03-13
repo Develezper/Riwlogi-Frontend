@@ -1,6 +1,7 @@
 import { api } from "../../../shared/services/api/index.js";
 import { showToast } from "../../../shared/utils/ui-helpers.js";
 import { formButton, setLoadingButton } from "../utils/admin-utils.js";
+import { handleStageEditorAction } from "../utils/stage-editor.js";
 import {
   DEFAULT_BATCH_COUNT,
   MAX_BATCH_COUNT,
@@ -211,6 +212,11 @@ export async function adminAiGenerateView(container) {
   };
 
   const onClick = async (event) => {
+    if (handleStageEditorAction(event)) {
+      state.error = null;
+      return;
+    }
+
     const trigger = event.target.closest("[data-action]");
     if (!trigger || !container.contains(trigger)) return;
     if (state.isGenerating) return;

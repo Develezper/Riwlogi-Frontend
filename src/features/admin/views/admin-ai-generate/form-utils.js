@@ -1,4 +1,5 @@
 import { parseCsv, stageEditorJson } from "../../utils/admin-utils.js";
+import { syncStageEditorJsonField } from "../../utils/stage-editor.js";
 
 function parseStagesJsonValue(rawValue) {
   const text = String(rawValue ?? "").trim();
@@ -21,6 +22,7 @@ function parseStagesJsonValue(rawValue) {
 }
 
 export function buildProblemDraftFromForm(form, baseProblem) {
+  syncStageEditorJsonField(form);
   const formData = new FormData(form);
   const stages = parseStagesJsonValue(formData.get("stages_json"));
 
