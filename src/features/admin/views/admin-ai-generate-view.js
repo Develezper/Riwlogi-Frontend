@@ -620,6 +620,10 @@ function syncCurrentFormIntoState(state, container) {
   state.generatedBatch = upsertProblemInBatch(state.generatedBatch, draft);
 }
 
+function goToProblemsCatalog() {
+  window.location.hash = "#/admin/problems";
+}
+
 function buildEditFormHtml(problem) {
   const title = escapeHtml(problem.title || "");
   const slug = escapeHtml(problem.slug || "");
@@ -1062,9 +1066,8 @@ export async function adminAiGenerateView(container) {
         state.generatedBatch = upsertProblemInBatch(state.generatedBatch, updated);
         state.savedProblemId = updated?.id || problemId;
 
-        showToast("Ejercicio guardado. Puedes seguir editando.", "success");
-        state.phase = "edit";
-        render();
+        showToast("Ejercicio guardado. Redirigiendo al catálogo…", "success");
+        goToProblemsCatalog();
       } catch (error) {
         if (!isMounted) return;
         state.error = error?.message || "No se pudo guardar el ejercicio.";
@@ -1140,16 +1143,16 @@ export async function adminAiGenerateView(container) {
         if (failedCount === 0) {
           showToast(
             targetStatus === "published"
-              ? `Se publicaron ${successCount} ejercicios.`
-              : `Se guardaron ${successCount} ejercicios como borrador.`,
+              ? `Se publicaron ${successCount} ejercicios. Redirigiendo al catálogo…`
+              : `Se guardaron ${successCount} ejercicios como borrador. Redirigiendo al catálogo…`,
             "success",
           );
+          goToProblemsCatalog();
         } else {
           state.error = `Guardado parcial: ${successCount} exitosos, ${failedCount} con error. ${firstError}`;
           showToast("Guardado parcial del lote. Revisa los errores.", "error");
+          render();
         }
-
-        render();
       } catch (error) {
         if (!isMounted) return;
         state.error = error?.message || "No se pudo guardar el lote.";
