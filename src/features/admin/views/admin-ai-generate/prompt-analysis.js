@@ -263,5 +263,8 @@ export function buildGenerationPrompt({
     `${difficultyInstruction}\n` +
     `- ${stageInstruction}\n` +
     `${uniquenessInstruction}\n` +
-    "- La única etapa debe incluir: stage_index, prompt_md, hidden_count y visible_tests.";
+    "- La única etapa debe incluir: stage_index, prompt_md, hidden_count y visible_tests.\n" +
+    "- El enunciado debe ser concreto y utilizable (objetivo, entradas, salidas, restricciones y al menos un ejemplo real).\n" +
+    "- No uses placeholders como example_input/example_output.\n" +
+    "- No copies ni incluyas estas instrucciones internas en la respuesta final.";
 }
