@@ -9,10 +9,7 @@ import {
   clampInt,
 } from "./admin-ai-generate/constants.js";
 import { resolveDifficultyPlan } from "./admin-ai-generate/difficulty-plan.js";
-import {
-  detectDuplicateReason,
-  ensureUniqueProblemTitle,
-} from "./admin-ai-generate/duplicate-utils.js";
+import { detectDuplicateReason } from "./admin-ai-generate/duplicate-utils.js";
 import {
   buildProblemDraftFromForm,
   buildUpdatePayloadFromProblem,
@@ -250,6 +247,7 @@ export async function adminAiGenerateView(container) {
               break;
             }
 
+<<<<<<< HEAD
             if (duplicateReason === "titulo") {
               const renamedCandidate = ensureUniqueProblemTitle(normalizedCandidate, createdProblems, {
                 fallbackBaseTitle: `Ejercicio ${index + 1}`,
@@ -260,6 +258,8 @@ export async function adminAiGenerateView(container) {
               }
             }
 
+=======
+>>>>>>> 65349b16aff115380a2014671b81521500f54d39
             lastDuplicateReason = duplicateReason;
           }
 
