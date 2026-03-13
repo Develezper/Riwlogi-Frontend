@@ -26,6 +26,10 @@ import {
   detectPromptExerciseCount,
   resolveStageInstruction,
 } from "./admin-ai-generate/prompt-analysis.js";
+import {
+  detectGeneratedProblemIssue,
+  normalizeGeneratedProblemCandidate,
+} from "./admin-ai-generate/generated-problem-utils.js";
 import { renderEditPhase, renderPromptPhase } from "./admin-ai-generate/render.js";
 
 export async function adminAiGenerateView(container) {
@@ -89,6 +93,7 @@ export async function adminAiGenerateView(container) {
           const difficulty = Array.isArray(difficultyPlan) ? difficultyPlan[index] || 2 : null;
           let created = null;
           let lastDuplicateReason = null;
+          let lastIssueReason = null;
 
           for (let attempt = 1; attempt <= MAX_UNIQUE_ATTEMPTS; attempt += 1) {
             const composedPrompt = buildGenerationPrompt({
@@ -110,7 +115,20 @@ export async function adminAiGenerateView(container) {
             render();
 
             const candidate = await api.admin.generateProblem({ prompt: composedPrompt });
-            const normalizedCandidate = ensureUniqueProblemTitle(candidate, createdProblems);
+            const sanitizedCandidate = normalizeGeneratedProblemCandidate(candidate, {
+              basePrompt: prompt,
+              batchIndex: index,
+              difficulty,
+            });
+            const qualityIssue = detectGeneratedProblemIssue(sanitizedCandidate, {
+              basePrompt: prompt,
+            });
+            if (qualityIssue) {
+              lastIssueReason = qualityIssue;
+              continue;
+            }
+
+            const normalizedCandidate = ensureUniqueProblemTitle(sanitizedCandidate, createdProblems);
             const duplicateReason = detectDuplicateReason(normalizedCandidate, createdProblems);
             if (!duplicateReason) {
               created = normalizedCandidate;
@@ -121,7 +139,8 @@ export async function adminAiGenerateView(container) {
           }
 
           if (!created) {
-            const reasonText = lastDuplicateReason ? ` (${lastDuplicateReason} repetido)` : "";
+            const issueText = lastIssueReason ? ` (${lastIssueReason})` : "";
+            const reasonText = lastDuplicateReason ? ` (${lastDuplicateReason} repetido)` : issueText;
             throw new Error(
               `No se pudo generar un ejercicio único para la posición ${index + 1}${reasonText}. Intenta ajustar el prompt.`,
             );

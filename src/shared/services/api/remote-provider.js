@@ -29,19 +29,27 @@ function resolveApiBase() {
   const fromEnv = normalizeApiBase(import.meta.env.VITE_API_BASE);
   if (fromEnv) return fromEnv;
 
-  const isLocalHost =
-    typeof window !== "undefined" &&
-    ["localhost", "127.0.0.1"].includes(String(window.location?.hostname || "").toLowerCase());
-
-  if (Boolean(import.meta.env.DEV) && isLocalHost) {
-    return "http://localhost:8000/api";
-  }
-
   return "/api";
 }
 
 const API_BASE = resolveApiBase();
 const TOKEN_KEY = "Riwlog_token";
+const USER_KEY = "Riwlog_user";
+const EXPIRES_KEY = "Riwlog_expires_at";
+
+function clearStoredSession() {
+  try {
+    window.localStorage.removeItem(TOKEN_KEY);
+    window.localStorage.removeItem(USER_KEY);
+    window.localStorage.removeItem(EXPIRES_KEY);
+  } catch {
+    return;
+  }
+
+  if (typeof window !== "undefined" && window.location.hash !== "#/auth/login") {
+    window.location.hash = "#/auth/login";
+  }
+}
 
 export class ApiHttpError extends Error {
   constructor(status, message, payload = null, diagnostics = null) {
@@ -137,6 +145,10 @@ async function request(endpoint, { body, query, params, requireAuth = false, tim
   const payload = isJson ? await response.json().catch(() => null) : await response.text().catch(() => null);
 
   if (!response.ok) {
+    if (requireAuth && response.status === 401) {
+      clearStoredSession();
+    }
+
     const message =
       (payload && typeof payload === "object" && (payload.message || payload.detail || payload.error)) ||
       response.statusText ||
