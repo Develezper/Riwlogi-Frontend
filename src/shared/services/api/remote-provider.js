@@ -357,6 +357,7 @@ export const remoteApi = {
       const { payload } = await request(API_CONTRACT.adminGenerateProblem, {
         requireAuth: true,
         body: data,
+        timeoutMs: 45_000,
       });
       return parseAdminProblemMutationResponse(payload);
     },
