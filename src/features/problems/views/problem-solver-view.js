@@ -107,7 +107,7 @@ function renderLayout(container, state) {
   const languageOptions = Object.keys(state.problem.starter_code || state.problem.starterCode || {});
 
   container.innerHTML = `
-    <div class="h-[calc(100vh-3.5rem)] flex flex-col">
+    <div class="exercise-scope h-[calc(100vh-3.5rem)] flex flex-col">
       <div class="px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex items-center gap-3">
