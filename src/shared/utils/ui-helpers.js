@@ -41,9 +41,9 @@ marked.setOptions({
 
 export function difficultyBadge(difficulty) {
   const map = {
-    1: { label: "Easy", class: "badge-easy" },
-    2: { label: "Medium", class: "badge-medium" },
-    3: { label: "Hard", class: "badge-hard" },
+    1: { label: "Fácil", class: "badge-easy" },
+    2: { label: "Intermedio", class: "badge-medium" },
+    3: { label: "Difícil", class: "badge-hard" },
   };
   return map[difficulty] || map[1];
 }

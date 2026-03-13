@@ -25,15 +25,15 @@ test("auth flow unlocks protected profile route", async ({ page }) => {
   await expect(page.getByText(/Recent Submissions/i)).toBeVisible();
 });
 
-test("solver can run and submit stages", async ({ page }) => {
+test("solver can run and submit in single-stage mode", async ({ page }) => {
   await login(page);
 
   await page.goto("/#/problem/two-sum");
-  await expect(page.getByText(/Visible tests/i)).toBeVisible();
+  await expect(page.getByText(/Casos de prueba/i)).toBeVisible();
 
-  await page.getByRole("button", { name: "Run" }).click();
-  await expect(page.locator("#results-panel")).toContainText(/Stage|Passed|Failed/i);
+  await page.getByRole("button", { name: "Ejecutar" }).click();
+  await expect(page.locator("#results-panel")).toContainText(/Salida por consola/i);
 
-  await page.getByRole("button", { name: "Submit" }).click();
-  await expect(page.locator("#toast-container")).toContainText(/Score final/i);
+  await page.getByRole("button", { name: "Enviar" }).click();
+  await expect(page.locator("#results-panel")).toContainText(/Validaciones de seguridad/i);
 });

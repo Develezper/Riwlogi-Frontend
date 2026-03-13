@@ -2,9 +2,9 @@ import { api } from "../../../shared/services/api/index.js";
 import { spinner } from "../../../shared/utils/ui-helpers.js";
 
 const verdictConfig = {
-  accepted: { label: "Accepted", color: "text-green-400 bg-green-500/10" },
-  wrong_answer: { label: "Wrong Answer", color: "text-red-400 bg-red-500/10" },
-  pending: { label: "Pending", color: "text-yellow-400 bg-yellow-500/10" },
+  accepted: { label: "Aceptado", color: "text-green-400 bg-green-500/10" },
+  wrong_answer: { label: "Respuesta incorrecta", color: "text-red-400 bg-red-500/10" },
+  pending: { label: "Pendiente", color: "text-yellow-400 bg-yellow-500/10" },
 };
 
 function formatDate(value) {
@@ -47,14 +47,14 @@ function renderProfile(container, profile, submissions) {
           <h1 class="text-2xl font-bold text-zinc-100">${user.display_name || user.username}</h1>
           <div class="mt-2 flex flex-wrap gap-4 text-sm text-zinc-400">
             <span>${user.email}</span>
-            <span>Joined ${formatDate(user.created_at)}</span>
-            <span>Rank #${profile.rank || "-"}</span>
-            <span>${profile.streak || 0}d streak</span>
+            <span>Se unió el ${formatDate(user.created_at)}</span>
+            <span>Posición #${profile.rank || "-"}</span>
+            <span>${profile.streak || 0} días de racha</span>
           </div>
         </div>
         <div class="flex items-center gap-2">
           <span class="text-2xl font-bold tabular-nums text-zinc-100">${stats.total_score.toLocaleString()}</span>
-          <span class="text-sm text-zinc-500">pts</span>
+          <span class="text-sm text-zinc-500">puntos</span>
         </div>
       </div>
 
@@ -71,22 +71,22 @@ function renderProfile(container, profile, submissions) {
         <div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
           <p class="text-sm text-zinc-500">Por dificultad</p>
           <div class="mt-2 space-y-2 text-sm">
-            <div class="flex items-center justify-between"><span class="text-green-400">Easy</span><span class="text-zinc-200">${stats.by_difficulty.easy}</span></div>
-            <div class="flex items-center justify-between"><span class="text-yellow-400">Medium</span><span class="text-zinc-200">${stats.by_difficulty.medium}</span></div>
-            <div class="flex items-center justify-between"><span class="text-red-400">Hard</span><span class="text-zinc-200">${stats.by_difficulty.hard}</span></div>
+            <div class="flex items-center justify-between"><span class="text-green-400">Fácil</span><span class="text-zinc-200">${stats.by_difficulty.easy}</span></div>
+            <div class="flex items-center justify-between"><span class="text-yellow-400">Intermedio</span><span class="text-zinc-200">${stats.by_difficulty.medium}</span></div>
+            <div class="flex items-center justify-between"><span class="text-red-400">Difícil</span><span class="text-zinc-200">${stats.by_difficulty.hard}</span></div>
           </div>
         </div>
 
         <div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
           <p class="text-sm text-zinc-500">Actividad</p>
           <p class="mt-1 text-3xl font-bold text-zinc-100">${submissions.length}</p>
-          <p class="text-xs text-zinc-500">submissions registradas</p>
+          <p class="text-xs text-zinc-500">envíos registrados</p>
           <p class="mt-3 text-sm text-zinc-400">Racha actual: <span class="text-brand">${profile.streak || 0} días</span></p>
         </div>
       </div>
 
       <div class="mb-8">
-        <h2 class="text-lg font-semibold text-zinc-100 mb-4">Badges</h2>
+        <h2 class="text-lg font-semibold text-zinc-100 mb-4">Insignias</h2>
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           ${(profile.badges || [])
             .map(
@@ -102,13 +102,13 @@ function renderProfile(container, profile, submissions) {
       </div>
 
       <div>
-        <h2 class="text-lg font-semibold text-zinc-100 mb-4">Recent Submissions</h2>
+        <h2 class="text-lg font-semibold text-zinc-100 mb-4">Envíos recientes</h2>
         <div class="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50">
           <div class="hidden sm:grid grid-cols-[1fr_130px_95px_90px_100px] items-center gap-4 border-b border-zinc-800 bg-zinc-900 px-4 py-3 text-xs font-medium uppercase tracking-wide text-zinc-500">
-            <span>Problem</span>
-            <span>Status</span>
+            <span>Problema</span>
+            <span>Estado</span>
             <span class="text-right">Lenguaje</span>
-            <span class="text-right">Score</span>
+            <span class="text-right">Puntaje</span>
             <span class="text-right">Fecha</span>
           </div>
 
@@ -134,7 +134,7 @@ function renderProfile(container, profile, submissions) {
                   `;
                   })
                   .join("")
-              : `<p class="text-center text-zinc-500 py-8">Aún no tienes submissions</p>`
+              : `<p class="text-center text-zinc-500 py-8">Aún no tienes envíos</p>`
           }
         </div>
       </div>

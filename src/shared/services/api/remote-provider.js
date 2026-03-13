@@ -33,6 +33,18 @@ export class ApiHttpError extends Error {
   }
 }
 
+function remoteTimeoutError() {
+  const error = new Error("Tiempo de espera agotado al contactar el servidor.");
+  error.code = "remote_timeout";
+  return error;
+}
+
+function remoteUnreachableError() {
+  const error = new Error("No se pudo conectar con el servidor.");
+  error.code = "remote_unreachable";
+  return error;
+}
+
 function endpointPath(endpoint, params = {}) {
   let path = endpoint.path;
 
@@ -47,7 +59,7 @@ function withTimeout(promise, timeoutMs = 4500) {
   return Promise.race([
     promise,
     new Promise((_, reject) => {
-      window.setTimeout(() => reject(new Error("remote_timeout")), timeoutMs);
+      window.setTimeout(() => reject(remoteTimeoutError()), timeoutMs);
     }),
   ]);
 }
@@ -90,10 +102,13 @@ async function request(endpoint, { body, query, params, requireAuth = false, tim
       timeoutMs,
     );
   } catch (error) {
-    if (error instanceof Error && error.message === "remote_timeout") {
+    if (
+      error instanceof Error &&
+      (error.code === "remote_timeout" || error.message === "remote_timeout")
+    ) {
       throw error;
     }
-    throw new Error("remote_unreachable");
+    throw remoteUnreachableError();
   }
 
   const contentType = response.headers.get("content-type") || "";
@@ -104,7 +119,7 @@ async function request(endpoint, { body, query, params, requireAuth = false, tim
     const message =
       (payload && typeof payload === "object" && (payload.message || payload.detail || payload.error)) ||
       response.statusText ||
-      "Request failed";
+      "La solicitud falló.";
 
     throw new ApiHttpError(response.status, String(message), payload, {
       url: response.url || url,
@@ -123,16 +138,20 @@ async function request(endpoint, { body, query, params, requireAuth = false, tim
 }
 
 function payloadType(value) {
-  if (value === null) return "null";
-  if (Array.isArray(value)) return "array";
+  if (value === null) return "nulo";
+  if (Array.isArray(value)) return "arreglo";
+  if (typeof value === "string") return "cadena";
+  if (typeof value === "number") return "número";
+  if (typeof value === "boolean") return "booleano";
+  if (typeof value === "undefined") return "indefinido";
   return typeof value;
 }
 
 function formatHealthDiagnostic({ url, status, contentType, reason }) {
   const resolvedUrl = url || `${API_BASE}${API_CONTRACT.health.path}`;
-  const resolvedStatus = typeof status === "number" ? String(status) : "n/a";
-  const resolvedType = contentType || "unknown";
-  return `Health check failed. url=${resolvedUrl} status=${resolvedStatus} content-type=${resolvedType} reason=${reason}`;
+  const resolvedStatus = typeof status === "number" ? String(status) : "n/d";
+  const resolvedType = contentType || "desconocido";
+  return `Falló la verificación de salud. url=${resolvedUrl} estado=${resolvedStatus} tipo-contenido=${resolvedType} motivo=${reason}`;
 }
 
 export const remoteApi = {
@@ -175,7 +194,7 @@ export const remoteApi = {
           url: meta.url,
           status: meta.status,
           contentType: meta.contentType,
-          reason: `expected JSON object but received ${payloadType(payload)}`,
+          reason: `se esperaba un objeto JSON pero se recibió ${payloadType(payload)}`,
         }),
       );
     }
@@ -338,6 +357,7 @@ export const remoteApi = {
       const { payload } = await request(API_CONTRACT.adminGenerateProblem, {
         requireAuth: true,
         body: data,
+        timeoutMs: 45_000,
       });
       return parseAdminProblemMutationResponse(payload);
     },

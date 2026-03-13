@@ -14,19 +14,19 @@ export function registerView(container) {
       <div class="w-full max-w-sm p-8 bg-zinc-900/60 border border-zinc-800 rounded-2xl">
         <div class="text-center mb-8">
           <h1 class="text-2xl font-bold text-white mb-2">Crear cuenta</h1>
-          <p class="text-zinc-400 text-sm">Empieza a competir por etapas hoy.</p>
+          <p class="text-zinc-400 text-sm">Empieza a competir con ejercicios de etapa única.</p>
         </div>
 
         <form id="register-form" class="space-y-4" novalidate>
           <div>
-            <label for="register-username" class="block text-sm text-zinc-400 mb-1">Username</label>
+            <label for="register-username" class="block text-sm text-zinc-400 mb-1">Usuario</label>
             <input id="register-username" type="text" name="username" required minlength="3" maxlength="50"
               autocomplete="username"
               class="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:border-brand transition"
-              placeholder="tu_username" />
+              placeholder="tu_usuario" />
           </div>
           <div>
-            <label for="register-email" class="block text-sm text-zinc-400 mb-1">Email</label>
+            <label for="register-email" class="block text-sm text-zinc-400 mb-1">Correo electrónico</label>
             <input id="register-email" type="email" name="email" required
               autocomplete="email"
               class="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:border-brand transition"

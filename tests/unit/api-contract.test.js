@@ -37,7 +37,7 @@ describe("api contract parsers", () => {
         tags: ["Arrays"],
         acceptance: 49,
         submissions: 100,
-        stages_count: 1,
+        stages_count: 3,
         statement_md: "Test",
         starter_code: { python: "print('ok')" },
         stages: [
@@ -48,10 +48,19 @@ describe("api contract parsers", () => {
             hidden_count: 1,
             visible_tests: [{ input_text: "1", expected_text: "2" }],
           },
+          {
+            id: "stage-2",
+            stage_index: 2,
+            prompt_md: "Second stage",
+            hidden_count: 2,
+            visible_tests: [{ input_text: "2", expected_text: "3" }],
+          },
         ],
       },
     });
 
+    expect(parsed.stages_count).toBe(1);
+    expect(parsed.stages.length).toBe(1);
     expect(parsed.stages[0].stage_index).toBe(1);
   });
 
