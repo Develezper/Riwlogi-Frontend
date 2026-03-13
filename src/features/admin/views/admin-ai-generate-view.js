@@ -9,7 +9,10 @@ import {
   clampInt,
 } from "./admin-ai-generate/constants.js";
 import { resolveDifficultyPlan } from "./admin-ai-generate/difficulty-plan.js";
-import { detectDuplicateReason } from "./admin-ai-generate/duplicate-utils.js";
+import {
+  detectDuplicateReason,
+  ensureUniqueProblemTitle,
+} from "./admin-ai-generate/duplicate-utils.js";
 import {
   buildProblemDraftFromForm,
   buildUpdatePayloadFromProblem,
@@ -107,9 +110,10 @@ export async function adminAiGenerateView(container) {
             render();
 
             const candidate = await api.admin.generateProblem({ prompt: composedPrompt });
-            const duplicateReason = detectDuplicateReason(candidate, createdProblems);
+            const normalizedCandidate = ensureUniqueProblemTitle(candidate, createdProblems);
+            const duplicateReason = detectDuplicateReason(normalizedCandidate, createdProblems);
             if (!duplicateReason) {
-              created = candidate;
+              created = normalizedCandidate;
               break;
             }
 

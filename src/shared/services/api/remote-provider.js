@@ -19,7 +19,28 @@ import {
   parseTagsResponse,
 } from "./contract.js";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+function normalizeApiBase(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw.endsWith("/") ? raw.slice(0, -1) : raw;
+}
+
+function resolveApiBase() {
+  const fromEnv = normalizeApiBase(import.meta.env.VITE_API_BASE);
+  if (fromEnv) return fromEnv;
+
+  const isLocalHost =
+    typeof window !== "undefined" &&
+    ["localhost", "127.0.0.1"].includes(String(window.location?.hostname || "").toLowerCase());
+
+  if (Boolean(import.meta.env.DEV) && isLocalHost) {
+    return "http://localhost:8000/api";
+  }
+
+  return "/api";
+}
+
+const API_BASE = resolveApiBase();
 const TOKEN_KEY = "Riwlog_token";
 
 export class ApiHttpError extends Error {
