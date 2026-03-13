@@ -6,7 +6,7 @@ if (app) {
   app.innerHTML = `
     <a href="#main" class="skip-link">Saltar al contenido principal</a>
     <div class="min-h-screen bg-zinc-950 text-zinc-100">
-      <header id="navbar" aria-label="Navegacion principal"></header>
+      <header id="navbar" aria-label="Navegación principal"></header>
       <main id="main" tabindex="-1" class="pb-10"></main>
       <div
         id="toast-container"

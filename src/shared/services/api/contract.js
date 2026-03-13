@@ -37,34 +37,69 @@ function assert(condition, message, payload = null) {
 }
 
 function assertObject(value, context) {
-  assert(value && typeof value === "object" && !Array.isArray(value), `${context} must be an object`, value);
+  assert(value && typeof value === "object" && !Array.isArray(value), `${context} debe ser un objeto`, value);
   return value;
 }
 
 function assertString(value, context) {
-  assert(typeof value === "string" && value.trim().length > 0, `${context} must be a non-empty string`, value);
+  assert(typeof value === "string" && value.trim().length > 0, `${context} debe ser una cadena no vacía`, value);
   return value;
 }
 
+function optionalString(value) {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === "string").join("\n");
+  }
+  return null;
+}
+
 function assertNumber(value, context) {
-  assert(typeof value === "number" && Number.isFinite(value), `${context} must be a finite number`, value);
+  assert(typeof value === "number" && Number.isFinite(value), `${context} debe ser un número finito`, value);
   return value;
 }
 
 function assertBoolean(value, context) {
-  assert(typeof value === "boolean", `${context} must be boolean`, value);
+  assert(typeof value === "boolean", `${context} debe ser booleano`, value);
   return value;
 }
 
 function assertArray(value, context) {
-  assert(Array.isArray(value), `${context} must be an array`, value);
+  assert(Array.isArray(value), `${context} debe ser un arreglo`, value);
   return value;
 }
 
 function validateDifficulty(value, context) {
   const difficulty = assertNumber(value, context);
-  assert([1, 2, 3].includes(difficulty), `${context} must be 1, 2 or 3`, value);
+  assert([1, 2, 3].includes(difficulty), `${context} debe ser 1, 2 o 3`, value);
   return difficulty;
+}
+
+function fallbackSingleStage(problemId = "problem") {
+  return {
+    id: `${problemId}-stage-1`,
+    stage_index: 1,
+    prompt_md: "Implementa la solución completa.",
+    hidden_count: 0,
+    visible_tests: [],
+  };
+}
+
+function normalizeSingleStage(stages, problemId = "problem") {
+  const list = Array.isArray(stages) ? stages : [];
+  if (!list.length) return [fallbackSingleStage(problemId)];
+
+  const first = list[0];
+  return [
+    {
+      ...first,
+      id: String(first.id || `${problemId}-stage-1`),
+      stage_index: 1,
+      prompt_md: String(first.prompt_md || "Implementa la solución completa."),
+      hidden_count: Number(first.hidden_count || 0),
+      visible_tests: Array.isArray(first.visible_tests) ? first.visible_tests : [],
+    },
+  ];
 }
 
 function validateUser(raw, context = "user") {
@@ -93,7 +128,7 @@ function validateProblemSummary(raw, index = 0) {
     ),
     acceptance: Number(value.acceptance || 0),
     submissions: Number(value.submissions || 0),
-    stages_count: Number(value.stages_count || 0),
+    stages_count: 1,
   };
 }
 
@@ -111,7 +146,7 @@ function validateStage(raw, index) {
   return {
     id: assertString(value.id, `problem.stages[${index}].id`),
     stage_index: assertNumber(value.stage_index, `problem.stages[${index}].stage_index`),
-    prompt_md: assertString(value.prompt_md || `Stage ${index + 1}`, `problem.stages[${index}].prompt_md`),
+    prompt_md: assertString(value.prompt_md || `Etapa ${index + 1}`, `problem.stages[${index}].prompt_md`),
     hidden_count: Number(value.hidden_count || 0),
     visible_tests: assertArray(value.visible_tests || [], `problem.stages[${index}].visible_tests`).map(
       (test, testIndex) =>
@@ -123,20 +158,24 @@ function validateStage(raw, index) {
 function validateStarterCode(raw) {
   const value = assertObject(raw, "problem.starter_code");
   const entries = Object.entries(value).filter(([, code]) => typeof code === "string" && code.trim().length > 0);
-  assert(entries.length > 0, "problem.starter_code must contain at least one non-empty language", raw);
+  assert(entries.length > 0, "problem.starter_code debe contener al menos un lenguaje no vacío", raw);
   return Object.fromEntries(entries.map(([language, code]) => [language, code]));
 }
 
 function validateProblem(raw) {
   const value = assertObject(raw, "problem");
+  const summary = validateProblemSummary(value, 0);
+  const rawStages = assertArray(value.stages || [], "problem.stages").map((stage, index) =>
+    validateStage(stage, index),
+  );
+  const stages = normalizeSingleStage(rawStages, summary.slug || summary.id);
 
   return {
-    ...validateProblemSummary(value, 0),
+    ...summary,
+    stages_count: 1,
     statement_md: assertString(value.statement_md || "", "problem.statement_md"),
     starter_code: validateStarterCode(value.starter_code || value.starterCode || {}),
-    stages: assertArray(value.stages || [], "problem.stages").map((stage, index) =>
-      validateStage(stage, index),
-    ),
+    stages,
   };
 }
 
@@ -148,6 +187,15 @@ function validateRunResult(raw) {
     stage_index: Number(value.stage_index || 1),
     stage_score: Number(value.stage_score || 0),
     runtime_ms: Number(value.runtime_ms || 0),
+    stdout: optionalString(value.stdout),
+    stderr: optionalString(value.stderr),
+    output: optionalString(value.output),
+    output_text: optionalString(value.output_text),
+    outputText: optionalString(value.outputText),
+    console_output: optionalString(value.console_output),
+    console_text: optionalString(value.console_text),
+    consoleText: optionalString(value.consoleText),
+    console: optionalString(value.console),
     visible_results: assertArray(value.visible_results || [], "submissions.run.result.visible_results").map(
       (item, index) => {
         const test = assertObject(item, `submissions.run.result.visible_results[${index}]`);
@@ -311,7 +359,11 @@ function validateAdminProblem(raw, index) {
 
 export function parseHealthResponse(payload) {
   const value = assertObject(payload, "health");
-  assert(value.ok === true || value.status === "ok", "health response must contain ok=true or status='ok'", payload);
+  assert(
+    value.ok === true || value.status === "ok",
+    "health response debe contener ok=true o status='ok'",
+    payload,
+  );
   return { ok: true };
 }
 

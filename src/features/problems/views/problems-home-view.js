@@ -15,10 +15,10 @@ export async function problemsHomeView(container) {
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
       <div class="text-center mb-8">
         <h1 class="text-3xl sm:text-4xl font-bold mb-3">
-          <span class="text-brand">Riw</span>log Challenges
+          Desafíos <span class="text-brand">Riw</span>log
         </h1>
         <p class="text-zinc-400 text-lg max-w-2xl mx-auto">
-          Resuelve problemas por etapas y demuestra tu proceso, no solo el resultado final.
+          Resuelve problemas en una etapa única y demuestra tu proceso, no solo el resultado final.
         </p>
       </div>
 
@@ -32,20 +32,20 @@ export async function problemsHomeView(container) {
         <label for="difficulty-select" class="sr-only">Filtrar por dificultad</label>
         <select id="difficulty-select" aria-label="Filtrar por dificultad" class="px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-200 text-sm focus:outline-none focus:border-brand transition">
           <option value="all">Todas las dificultades</option>
-          <option value="1">Easy</option>
-          <option value="2">Medium</option>
-          <option value="3">Hard</option>
+          <option value="1">Fácil</option>
+          <option value="2">Intermedio</option>
+          <option value="3">Difícil</option>
         </select>
 
-        <label for="tag-select" class="sr-only">Filtrar por tag</label>
-        <select id="tag-select" aria-label="Filtrar por tag" class="px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-200 text-sm focus:outline-none focus:border-brand transition">
-          <option value="all">Todos los tags</option>
+        <label for="tag-select" class="sr-only">Filtrar por etiqueta</label>
+        <select id="tag-select" aria-label="Filtrar por etiqueta" class="px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-200 text-sm focus:outline-none focus:border-brand transition">
+          <option value="all">Todas las etiquetas</option>
         </select>
       </div>
 
       <div class="flex items-center justify-between mb-4">
         <p id="results-label" class="text-sm text-zinc-500" aria-live="polite"></p>
-        <a href="#/leaderboard" class="text-sm text-brand hover:text-brand-dark transition">Ver ranking global</a>
+        <a href="#/leaderboard" class="text-sm text-brand hover:text-brand-dark transition">Ver clasificación global</a>
       </div>
 
       <div id="problem-list" class="grid gap-3">
@@ -66,7 +66,7 @@ export async function problemsHomeView(container) {
     state.tags = tags;
 
     tagSelect.innerHTML = [
-      '<option value="all">Todos los tags</option>',
+      '<option value="all">Todas las etiquetas</option>',
       ...tags.map((tag) => `<option value="${tag}">${tag}</option>`),
     ].join("");
 
@@ -119,7 +119,7 @@ export async function problemsHomeView(container) {
       listEl.innerHTML = `
         <div class="text-center py-12 text-zinc-500 border border-zinc-800 rounded-xl bg-zinc-900/40">
           <p class="text-lg mb-2">Sin resultados con los filtros actuales</p>
-          <p class="text-sm">Prueba con otra dificultad, tag o término de búsqueda.</p>
+          <p class="text-sm">Prueba con otra dificultad, etiqueta o término de búsqueda.</p>
         </div>
       `;
       return;

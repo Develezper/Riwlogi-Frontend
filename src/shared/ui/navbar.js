@@ -4,7 +4,7 @@ import { api } from "../services/api/index.js";
 
 const publicLinks = [
   { path: "problems", label: "Problemas" },
-  { path: "leaderboard", label: "Leaderboard" },
+  { path: "leaderboard", label: "Clasificación" },
 ];
 
 let detachListeners = null;
@@ -88,8 +88,9 @@ export function renderNavbar() {
   const user = store.getUser();
   const isAuth = store.isAuthenticated();
   const isAdmin = isAuth && user?.role === "admin";
-  const links = isAdmin ? [...publicLinks, { path: "admin", label: "Admin" }] : publicLinks;
+  const links = isAdmin ? [...publicLinks, { path: "admin", label: "Administración" }] : publicLinks;
   const activePath = currentPath();
+  const showProfileLink = isAuth && !isAdmin;
 
   nav.className = "sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md";
 
@@ -121,9 +122,15 @@ export function renderNavbar() {
         ${
           isAuth
             ? `
+          ${
+            showProfileLink
+              ? `
           <a href="#/profile" class="${linkClass(isActive("profile", activePath))}">
             ${escapeHtml(user?.username || "Perfil")}
           </a>
+        `
+              : ""
+          }
           <button id="btn-logout" class="ml-2 px-3 py-1.5 rounded-md text-sm text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition">
             Salir
           </button>
@@ -155,9 +162,15 @@ export function renderNavbar() {
         ${
           isAuth
             ? `
+          ${
+            showProfileLink
+              ? `
           <a href="#/profile" class="${linkClass(isActive("profile", activePath))}">
             ${escapeHtml(user?.username || "Perfil")}
           </a>
+        `
+              : ""
+          }
           <button id="btn-logout-mobile" class="px-3 py-1.5 rounded-md text-sm text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition text-left">
             Salir
           </button>
