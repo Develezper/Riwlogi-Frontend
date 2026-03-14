@@ -41,17 +41,26 @@ function renderResultHeader(view) {
 		? `<svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`
 		: `<svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
 
-	const statusText = passed ? "Todos los tests pasaron" : "Algunos tests fallaron";
+	const statusText = passed
+		? "Todos los tests pasaron"
+		: "Algunos tests fallaron";
 	const statusColor = passed ? "text-green-400" : "text-red-400";
 	const borderColor = passed ? "border-green-500/30" : "border-red-500/30";
 	const bgColor = passed ? "bg-green-500/5" : "bg-red-500/5";
 
 	const scoreColor =
-		score === 100 ? "text-green-400" : score > 0 ? "text-yellow-400" : "text-red-400";
+		score === 100
+			? "text-green-400"
+			: score > 0
+				? "text-yellow-400"
+				: "text-red-400";
 
 	const metaItems = [];
-	if (Number.isFinite(runtimeMs)) metaItems.push(`<span class="text-zinc-500">&#9201; ${runtimeMs}ms</span>`);
-	metaItems.push(`<span class="${scoreColor} font-semibold">${score}/100</span>`);
+	if (Number.isFinite(runtimeMs))
+		metaItems.push(`<span class="text-zinc-500">&#9201; ${runtimeMs}ms</span>`);
+	metaItems.push(
+		`<span class="${scoreColor} font-semibold">${score}/100</span>`,
+	);
 
 	return `
     <div class="flex items-center justify-between p-3 rounded-lg border ${borderColor} ${bgColor}">
@@ -75,12 +84,13 @@ function renderTestResult(test, index) {
 	const borderColor = passed ? "border-green-500/20" : "border-red-500/20";
 	const labelColor = passed ? "text-green-400" : "text-red-400";
 
-	const outputRow = test.output_text != null
-		? `<div class="flex gap-2">
+	const outputRow =
+		test.output_text !== null
+			? `<div class="flex gap-2">
         <span class="text-zinc-500 shrink-0 w-16">Obtenido:</span>
         <span class="${passed ? "text-zinc-200" : "text-red-300"}">${escapeHtml(String(test.output_text))}</span>
       </div>`
-		: "";
+			: "";
 
 	const errorRow = test.error
 		? `<div class="mt-1 text-red-400/80 text-[11px]">${escapeHtml(String(test.error))}</div>`
@@ -136,9 +146,10 @@ function renderVerdictBanner(verdict, finalScore) {
 	const borderColor = isAccepted ? "border-green-500/30" : "border-red-500/30";
 	const bgColor = isAccepted ? "bg-green-500/5" : "bg-red-500/5";
 
-	const scoreDisplay = finalScore !== null
-		? `<span class="text-2xl font-bold ${isAccepted ? "text-green-400" : "text-red-400"}">${finalScore}</span><span class="text-sm text-zinc-500 ml-0.5">pts</span>`
-		: "";
+	const scoreDisplay =
+		finalScore !== null
+			? `<span class="text-2xl font-bold ${isAccepted ? "text-green-400" : "text-red-400"}">${finalScore}</span><span class="text-sm text-zinc-500 ml-0.5">pts</span>`
+			: "";
 
 	return `
     <div class="flex items-center justify-between p-4 rounded-lg border ${borderColor} ${bgColor}">
