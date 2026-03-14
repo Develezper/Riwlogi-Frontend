@@ -11,4 +11,4 @@ function detectGeneratedProblemIssue(problem) {
     return 'No issues detected';
 }
 
-module.exports = { detectGeneratedProblemIssue };
+export { detectGeneratedProblemIssue };
