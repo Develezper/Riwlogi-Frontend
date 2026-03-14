@@ -13,16 +13,25 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "lint": "eslint .",
+    "lint": "eslint --concurrency=auto .",
+    "lint:fix": "eslint --concurrency=auto --fix .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "ci": "bun run lint && bun run test && bun run build"
+    "ci": "bun run lint && bun run test && bun run build",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs}": [
+      "eslint --concurrency=auto --fix"
+    ]
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
     "eslint": "^10.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.6",
     "tailwindcss": "^4.1.18",
     "vite": "^7.3.1",
     "vitest": "^3.2.4",
