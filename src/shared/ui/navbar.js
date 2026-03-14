@@ -43,7 +43,7 @@ function applyFocus(enabled) {
 }
 
 function focusButtonLabel(isOn) {
-  return isOn ? "Salir Fokus" : "Modo Fokus";
+  return isOn ? "Salir Focus" : "Modo Focus";
 }
 
 function renderFocusFab(currentTheme, focusOn) {
@@ -65,9 +65,9 @@ function renderFocusFab(currentTheme, focusOn) {
   fab.innerHTML = `
     <div class="focus-fab-panel">
       <button id="focus-fab-toggle" class="focus-fab-toggle" aria-haspopup="true" aria-expanded="false">
-        Fokus
+        Focus
       </button>
-      <div id="focus-fab-menu" class="focus-fab-menu" role="menu" aria-label="Menú de Fokus">
+      <div id="focus-fab-menu" class="focus-fab-menu" role="menu" aria-label="Menú de Focus">
         <div class="focus-fab-title">Temas</div>
         ${themes
           .map(
@@ -80,7 +80,7 @@ function renderFocusFab(currentTheme, focusOn) {
           .join("")}
         <div class="focus-fab-divider"></div>
         <button type="button" class="focus-fab-item focus-fab-exit" data-exit="true" role="menuitem">
-          Salir Fokus
+          Salir Focus
         </button>
       </div>
     </div>
