@@ -85,7 +85,7 @@ function renderTestResult(test, index) {
 	const labelColor = passed ? "text-green-400" : "text-red-400";
 
 	const outputRow =
-		test.output_text != null
+		test.output_text !== null && test.output_text !== undefined
 			? `<div class="flex gap-2">
         <span class="text-zinc-500 shrink-0 w-16">Obtenido:</span>
         <span class="${passed ? "text-zinc-200" : "text-red-300"}">${escapeHtml(String(test.output_text))}</span>
