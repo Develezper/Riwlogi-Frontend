@@ -48,9 +48,9 @@ function parseCountFromIndex(tokens, index, fallback, min, max) {
   return parsePromptCountToken(tokens[index], fallback, min, max);
 }
 
-function detectCountBeforeNouns(tokens, nouns, fallback, min, max) {
+function detectCountNearNouns(tokens, nounMatchFn, fallback, min, max) {
   for (let index = 0; index < tokens.length; index += 1) {
-    if (!nouns.has(tokens[index])) continue;
+    if (!nounMatchFn(tokens[index])) continue;
 
     const direct = parseCountFromIndex(tokens, index - 1, fallback, min, max);
     if (direct !== null) return direct;
@@ -59,16 +59,38 @@ function detectCountBeforeNouns(tokens, nouns, fallback, min, max) {
       const throughConnector = parseCountFromIndex(tokens, index - 2, fallback, min, max);
       if (throughConnector !== null) return throughConnector;
     }
+
+    const forward = parseCountFromIndex(tokens, index + 1, fallback, min, max);
+    if (forward !== null) return forward;
+
+    if (CONNECTOR_TOKENS.has(tokens[index + 1])) {
+      const throughForwardConnector = parseCountFromIndex(tokens, index + 2, fallback, min, max);
+      if (throughForwardConnector !== null) return throughForwardConnector;
+    }
   }
 
   return null;
+}
+
+function isExerciseNounToken(token) {
+  const clean = normalizeComparableText(token);
+  if (!clean) return false;
+  if (EXERCISE_NOUNS.has(clean)) return true;
+
+  return (
+    startsWithTokenPrefix(clean, "ejer") ||
+    startsWithTokenPrefix(clean, "ejec") ||
+    startsWithTokenPrefix(clean, "proble") ||
+    startsWithTokenPrefix(clean, "reto") ||
+    startsWithTokenPrefix(clean, "chall")
+  );
 }
 
 export function detectPromptExerciseCount(prompt) {
   const tokens = tokenizeComparableText(prompt);
   if (!tokens.length) return null;
 
-  return detectCountBeforeNouns(tokens, EXERCISE_NOUNS, DEFAULT_BATCH_COUNT, 1, MAX_BATCH_COUNT);
+  return detectCountNearNouns(tokens, isExerciseNounToken, DEFAULT_BATCH_COUNT, 1, MAX_BATCH_COUNT);
 }
 
 function isHardToken(token) {
@@ -258,6 +280,7 @@ export function buildGenerationPrompt({
 
   return `${basePrompt}\n\n` +
     `Instrucciones internas para esta generación:\n` +
+    `- Prioridad máxima: respeta el objetivo, dominio y restricciones del prompt base del usuario.\n` +
     `- Genera un solo ejercicio (no una lista).\n` +
     `- Este es el ejercicio ${batchIndex + 1} de ${batchCount}.\n` +
     `${difficultyInstruction}\n` +

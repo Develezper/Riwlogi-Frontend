@@ -9,6 +9,41 @@ import {
   setLoadingButton,
 } from "../utils/admin-utils.js";
 
+function parseStagesJson(rawValue) {
+  const text = String(rawValue ?? "").trim();
+  if (!text) {
+    throw new Error("El JSON de etapas no puede estar vacío.");
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("El JSON de etapas es inválido.");
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("El JSON de etapas debe ser un arreglo.");
+  }
+
+  const firstStage = parsed[0] || {};
+  return [
+    {
+      stage_index: 1,
+      prompt_md: String(firstStage.prompt_md || "").trim(),
+      hidden_count: Math.max(0, Number.parseInt(String(firstStage.hidden_count ?? 0), 10) || 0),
+      visible_tests: Array.isArray(firstStage.visible_tests)
+        ? firstStage.visible_tests
+            .map((test) => ({
+              input_text: String(test?.input_text || "").trim(),
+              expected_text: String(test?.expected_text || "").trim(),
+            }))
+            .filter((test) => test.input_text || test.expected_text)
+        : [],
+    },
+  ];
+}
+
 function buildEditFormHtml(problem) {
   const title = escapeHtml(problem.title || "");
   const slug = escapeHtml(problem.slug || "");
@@ -208,7 +243,8 @@ export async function adminEditProblemView(container, params = {}) {
           python: String(formData.get("starter_python") || "").trimEnd(),
           javascript: String(formData.get("starter_javascript") || "").trimEnd(),
         },
-        stages_json: formData.get("stages_json"),
+        stages: parseStagesJson(formData.get("stages_json")),
+        stages_count: 1,
       };
 
       if (state.problem?.source === "ai" || state.problem?.ai_generated) {
