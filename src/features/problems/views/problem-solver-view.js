@@ -10,6 +10,7 @@ export async function problemSolverView(container, { slug }) {
     stageResults: {},
     lastAction: null,
     lastSecurityCheck: null,
+    lastSubmitResult: null,
     language: "python",
     submissionId: null,
     tracker: null,
@@ -222,8 +223,11 @@ function bindEvents(container, state) {
       const output = extractConsoleOutput(result);
       state.stageResults[activeStage.id] = {
         output,
+        passed: Boolean(result.passed),
+        stage_score: Number(result.stage_score || 0),
         runtime_ms: Number(result.runtime_ms || 0),
         stage_index: result.stage_index || activeStage.stage_index,
+        visible_results: result.visible_results || [],
         classification: result.classification || null,
       };
       if (result.classification) {
@@ -236,8 +240,11 @@ function bindEvents(container, state) {
         {
           mode: "run",
           output,
+          passed: Boolean(result.passed),
+          stage_score: Number(result.stage_score || 0),
           runtime_ms: Number(result.runtime_ms || 0),
           stage_index: result.stage_index || activeStage.stage_index,
+          visible_results: result.visible_results || [],
         },
         false,
       );
@@ -271,8 +278,11 @@ function bindEvents(container, state) {
         const output = extractConsoleOutput(runResult);
         state.stageResults[activeStage.id] = {
           output,
+          passed: Boolean(runResult.passed),
+          stage_score: Number(runResult.stage_score || 0),
           runtime_ms: Number(runResult.runtime_ms || 0),
           stage_index: runResult.stage_index || activeStage.stage_index,
+          visible_results: runResult.visible_results || [],
           classification: runResult.classification || null,
         };
         if (runResult.classification) {
@@ -280,11 +290,27 @@ function bindEvents(container, state) {
         }
       }
 
-      await api.submissions.submit(state.submissionId);
+      const submitResult = await api.submissions.submit(state.submissionId);
 
-      state.lastSecurityCheck = security;
-      updateResultsPanel(container, state, { mode: "submit", security }, false);
-      showToast("Envío registrado. Revisa las validaciones de seguridad.", "success", 5000);
+      state.lastSecurityCheck = submitResult.classification || security;
+      state.lastSubmitResult = submitResult;
+      updateResultsPanel(
+        container,
+        state,
+        {
+          mode: "submit",
+          verdict: submitResult.verdict,
+          final_score: submitResult.final_score,
+          security: submitResult.classification || security,
+        },
+        false,
+      );
+
+      if (submitResult.verdict === "accepted") {
+        showToast("¡Problema resuelto correctamente!", "success", 5000);
+      } else {
+        showToast("Envío registrado. Revisa los resultados.", "info", 5000);
+      }
     } catch (error) {
       showToast(error.message, "error");
       updateResultsPanel(container, state, { mode: "submit", security: state.lastSecurityCheck }, false);
@@ -569,15 +595,21 @@ function buildRunView(state, stage) {
   return {
     mode: "run",
     output: stored.output,
+    passed: stored.passed,
+    stage_score: stored.stage_score,
     runtime_ms: stored.runtime_ms,
     stage_index: stored.stage_index || stage.stage_index,
+    visible_results: stored.visible_results || [],
   };
 }
 
 function buildSubmitView(state) {
+  const result = state.lastSubmitResult;
   return {
     mode: "submit",
-    security: state.lastSecurityCheck || null,
+    verdict: result?.verdict || null,
+    final_score: result?.final_score ?? null,
+    security: result?.classification || state.lastSecurityCheck || null,
   };
 }
 
