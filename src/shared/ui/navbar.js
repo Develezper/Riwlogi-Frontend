@@ -1,6 +1,7 @@
 import { store } from "../state/session-store.js";
 import { router } from "../../app/router.js";
 import { api } from "../services/api/index.js";
+import { withViewTransition } from "../utils/ui-helpers.js";
 
 const publicLinks = [
   { path: "problems", label: "Problemas" },
@@ -26,7 +27,9 @@ function getStoredTheme() {
 
 function applyTheme(themeValue) {
   const resolved = themes.some((theme) => theme.value === themeValue) ? themeValue : "dark-modern";
-  document.body.dataset.theme = resolved;
+  withViewTransition(() => {
+    document.body.dataset.theme = resolved;
+  });
   window.localStorage.setItem(THEME_KEY, resolved);
   return resolved;
 }
