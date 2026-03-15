@@ -7,6 +7,8 @@ const FILTERS = [
   { id: "all", label: "Todo el tiempo" },
 ];
 
+const PAGE_SIZE_OPTIONS = [10, 20, 40];
+
 function filterButtonClass(active) {
   return active
     ? "px-3 py-1.5 rounded-md text-xs bg-brand text-white"
@@ -17,6 +19,8 @@ export async function leaderboardView(container) {
   const state = {
     timeframe: "all",
     entries: [],
+    page: 1,
+    pageSize: PAGE_SIZE_OPTIONS[0],
   };
 
   container.innerHTML = `
@@ -58,6 +62,10 @@ export async function leaderboardView(container) {
 
     const top3 = state.entries.slice(0, 3);
     const rest = state.entries.slice(3);
+    const totalPages = Math.max(1, Math.ceil(rest.length / state.pageSize));
+    state.page = Math.min(Math.max(1, state.page), totalPages);
+    const start = (state.page - 1) * state.pageSize;
+    const pagedRest = rest.slice(start, start + state.pageSize);
 
     const podiumHtml = `
       <div class="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -100,11 +108,11 @@ export async function leaderboardView(container) {
           <span class="text-right">Resueltos</span>
           <span class="text-right">Racha</span>
         </div>
-        ${rest
+        ${pagedRest
           .map(
             (entry, index) => `
           <div class="flex items-center gap-3 border-b border-zinc-800 px-4 py-3 sm:grid sm:grid-cols-[56px_1fr_120px_90px_90px] sm:gap-4 ${
-            index === rest.length - 1 ? "border-b-0" : ""
+            index === pagedRest.length - 1 ? "border-b-0" : ""
           }" style="view-transition-name: lb-${entry.username}">
             <span class="w-8 h-8 rounded-full bg-zinc-800 text-zinc-300 text-xs font-semibold flex items-center justify-center sm:mx-auto">${
               entry.rank
@@ -123,7 +131,18 @@ export async function leaderboardView(container) {
           )
           .join("")}
       </div>
-      <p class="text-center text-sm text-zinc-500 mt-4">Mostrando ${state.entries.length} usuarios</p>
+      <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-sm text-zinc-500">Mostrando ${rest.length ? start + 1 : 0}-${rest.length ? Math.min(start + state.pageSize, rest.length) : 0} de ${rest.length} (sin contar podio)</p>
+        <div class="flex flex-wrap items-center gap-2">
+          <label for="leaderboard-page-size" class="text-xs text-zinc-500">Por página</label>
+          <select id="leaderboard-page-size" data-action="page-size" class="px-2 py-1 rounded-md border border-zinc-700 bg-zinc-900 text-zinc-200 text-xs">
+            ${PAGE_SIZE_OPTIONS.map((size) => `<option value="${size}" ${size === state.pageSize ? "selected" : ""}>${size}</option>`).join("")}
+          </select>
+          <button data-action="page-prev" class="px-3 py-1 rounded-md border border-zinc-700 text-zinc-200 text-xs disabled:opacity-40" ${state.page <= 1 ? "disabled" : ""}>Anterior</button>
+          <span class="text-xs text-zinc-400">Página ${state.page} de ${totalPages}</span>
+          <button data-action="page-next" class="px-3 py-1 rounded-md border border-zinc-700 text-zinc-200 text-xs disabled:opacity-40" ${state.page >= totalPages ? "disabled" : ""}>Siguiente</button>
+        </div>
+      </div>
     `;
 
     contentEl.innerHTML = `${podiumHtml}${restHtml}`;
@@ -135,6 +154,7 @@ export async function leaderboardView(container) {
       const entries = await api.leaderboard.get({ timeframe: state.timeframe });
       if (isDisposed) return;
       state.entries = entries;
+      state.page = 1;
       withViewTransition(() => renderContent());
     } catch (error) {
       if (isDisposed) return;
@@ -152,11 +172,39 @@ export async function leaderboardView(container) {
     if (!button) return;
 
     state.timeframe = button.dataset.filter;
+    state.page = 1;
     renderFilters();
     void loadEntries();
   };
 
+  const onContentClick = (event) => {
+    const trigger = event.target.closest("[data-action]");
+    if (!trigger || !contentEl.contains(trigger)) return;
+
+    if (trigger.dataset.action === "page-prev") {
+      state.page = Math.max(1, state.page - 1);
+      withViewTransition(() => renderContent());
+      return;
+    }
+
+    if (trigger.dataset.action === "page-next") {
+      state.page += 1;
+      withViewTransition(() => renderContent());
+    }
+  };
+
+  const onContentChange = (event) => {
+    const trigger = event.target.closest("[data-action='page-size']");
+    if (!trigger || !contentEl.contains(trigger)) return;
+    const nextSize = Number(trigger.value);
+    state.pageSize = PAGE_SIZE_OPTIONS.includes(nextSize) ? nextSize : PAGE_SIZE_OPTIONS[0];
+    state.page = 1;
+    withViewTransition(() => renderContent());
+  };
+
   filtersEl.addEventListener("click", onFilterClick);
+  contentEl.addEventListener("click", onContentClick);
+  contentEl.addEventListener("change", onContentChange);
 
   renderFilters();
   await loadEntries();
@@ -164,5 +212,7 @@ export async function leaderboardView(container) {
   return () => {
     isDisposed = true;
     filtersEl.removeEventListener("click", onFilterClick);
+    contentEl.removeEventListener("click", onContentClick);
+    contentEl.removeEventListener("change", onContentChange);
   };
 }
