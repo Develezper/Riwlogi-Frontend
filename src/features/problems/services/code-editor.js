@@ -1,4 +1,5 @@
 import { saveDraft, scheduleDraftSave } from "./draft-storage.js";
+import { pythonSnippets, javascriptSnippets } from "./editor-snippets.js";
 
 export function clearEditorBindings(state) {
   state.editorCleanupFns.forEach((fn) => {
@@ -26,17 +27,45 @@ export async function mountEditor(container, state, initialCode) {
   editorElement.innerHTML = "";
 
   try {
-    const [{ EditorView, basicSetup }, { EditorState }, { oneDark }, { ViewPlugin }, pythonMod, jsMod] =
-      await Promise.all([
-        import("codemirror"),
-        import("@codemirror/state"),
-        import("@codemirror/theme-one-dark"),
-        import("@codemirror/view"),
-        import("@codemirror/lang-python"),
-        import("@codemirror/lang-javascript"),
-      ]);
+    const [
+      { EditorView, basicSetup },
+      { EditorState },
+      { oneDark },
+      { ViewPlugin },
+      { snippetCompletion, completeFromList },
+      { indentUnit },
+      pythonMod,
+      jsMod,
+    ] = await Promise.all([
+      import("codemirror"),
+      import("@codemirror/state"),
+      import("@codemirror/theme-one-dark"),
+      import("@codemirror/view"),
+      import("@codemirror/autocomplete"),
+      import("@codemirror/language"),
+      import("@codemirror/lang-python"),
+      import("@codemirror/lang-javascript"),
+    ]);
 
-    const langExtension = state.language === "python" ? pythonMod.python() : jsMod.javascript();
+    const snippetMap = {
+      python: pythonSnippets,
+      javascript: javascriptSnippets,
+      typescript: javascriptSnippets,
+    };
+
+    const langMap = {
+      python: () => pythonMod.python(),
+      javascript: () => jsMod.javascript({ typescript: true, jsx: true }),
+      typescript: () => jsMod.javascript({ typescript: true, jsx: true }),
+    };
+
+    const langExtension = (langMap[state.language] || langMap.python)();
+
+    const snippets = snippetMap[state.language] || [];
+    const snippetCompletions = snippets.map(({ label, detail, snippet }) =>
+      snippetCompletion(snippet, { label, detail, type: "keyword", boost: 1 }),
+    );
+    const snippetSource = completeFromList(snippetCompletions);
 
     const trackingPlugin = ViewPlugin.define(() => ({
       update(update) {
@@ -75,7 +104,14 @@ export async function mountEditor(container, state, initialCode) {
 
     const editorState = EditorState.create({
       doc: initialCode,
-      extensions: [basicSetup, oneDark, langExtension, trackingPlugin],
+      extensions: [
+        basicSetup,
+        oneDark,
+        langExtension,
+        indentUnit.of("    "),
+        EditorState.languageData.of(() => [{ autocomplete: snippetSource }]),
+        trackingPlugin,
+      ],
     });
 
     state.editorView = new EditorView({
@@ -91,7 +127,8 @@ export async function mountEditor(container, state, initialCode) {
 
     state.editorCleanupFns.push(() => editorElement.removeEventListener("focusin", onFocus));
     state.editorCleanupFns.push(() => editorElement.removeEventListener("focusout", onBlur));
-  } catch {
+  } catch (err) {
+    console.error("[code-editor] Failed to mount CodeMirror:", err);
     editorElement.innerHTML = `
       <textarea id="code-textarea"
         class="w-full h-full bg-zinc-950 text-zinc-100 font-mono text-sm p-4 resize-none outline-none border-none"
