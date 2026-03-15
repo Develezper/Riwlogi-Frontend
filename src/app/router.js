@@ -10,6 +10,7 @@ import { adminUsersView } from "../features/admin/views/admin-users-view.js";
 import { adminAiGenerateView } from "../features/admin/views/admin-ai-generate-view.js";
 import { adminEditProblemView } from "../features/admin/views/admin-edit-problem-view.js";
 import { store } from "../shared/state/session-store.js";
+import { transitionView } from "../shared/ui/animation.js";
 
 const routes = [
   { path: "", view: problemsHomeView },
@@ -111,10 +112,7 @@ export const router = {
     const currentToken = ++renderToken;
     cleanupView();
 
-    main.innerHTML = "";
-    main.classList.add("animate-fade-in");
-
-    Promise.resolve(route.view(main, params))
+    Promise.resolve(transitionView(main, () => route.view(main, params)))
       .then((cleanup) => {
         if (currentToken !== renderToken) {
           if (typeof cleanup === "function") cleanup();
@@ -135,11 +133,6 @@ export const router = {
             </div>
           </div>
         `;
-      })
-      .finally(() => {
-        window.setTimeout(() => {
-          main.classList.remove("animate-fade-in");
-        }, 300);
       });
   },
 
