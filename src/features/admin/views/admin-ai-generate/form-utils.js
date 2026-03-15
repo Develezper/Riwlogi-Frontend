@@ -56,6 +56,7 @@ export function buildProblemDraftFromForm(form, baseProblem) {
     starter_code: {
       python: String(formData.get("starter_python") || "").trimEnd(),
       javascript: String(formData.get("starter_javascript") || "").trimEnd(),
+      typescript: String(formData.get("starter_typescript") || "").trimEnd(),
     },
     stages,
     stages_count: 1,
@@ -76,6 +77,7 @@ export function buildUpdatePayloadFromProblem(problem, options = {}) {
     starter_code: {
       python: String(problem.starter_code?.python || "").trimEnd(),
       javascript: String(problem.starter_code?.javascript || "").trimEnd(),
+      typescript: String(problem.starter_code?.typescript || "").trimEnd(),
     },
     stages,
     stages_count: 1,

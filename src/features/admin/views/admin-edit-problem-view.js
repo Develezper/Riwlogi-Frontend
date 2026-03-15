@@ -8,6 +8,7 @@ import {
   formButton,
   setLoadingButton,
 } from "../utils/admin-utils.js";
+import { mountAdminFormEditors } from "../utils/admin-form-editors.js";
 
 function parseStagesJson(rawValue) {
   const text = String(rawValue ?? "").trim();
@@ -53,6 +54,7 @@ function buildEditFormHtml(problem) {
   const statement = escapeHtml(problem.statement_md || "");
   const python = escapeHtml(problem.starter_code?.python || "");
   const js = escapeHtml(problem.starter_code?.javascript || "");
+  const ts = escapeHtml(problem.starter_code?.typescript || "");
   const stagesEditor = buildStageEditorHtml(problem.stages);
 
   return `
@@ -96,22 +98,42 @@ function buildEditFormHtml(problem) {
           class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
       </div>
 
-      <div>
-        <label class="block text-xs text-zinc-400 mb-1">Enunciado (Markdown)</label>
+      <div data-md-editor>
+        <div class="flex items-center justify-between mb-1">
+          <label class="block text-xs text-zinc-400">Enunciado (Markdown)</label>
+          <button type="button" data-md-toggle
+            class="text-[11px] text-zinc-500 hover:text-zinc-300 transition px-2 py-0.5 rounded border border-zinc-700 hover:border-zinc-500">
+            Preview
+          </button>
+        </div>
         <textarea name="statement_md" rows="7"
           class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition resize-none">${statement}</textarea>
+        <div data-md-preview
+          class="hidden w-full min-h-40 px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-sm overflow-auto prose-content">
+        </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label class="block text-xs text-zinc-400 mb-1">Código inicial Python</label>
-          <textarea name="starter_python" rows="6"
-            class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100 focus:outline-none focus:border-brand transition resize-none">${python}</textarea>
+          <div data-code-editor="python" class="rounded-lg overflow-hidden border border-zinc-700">
+            <textarea name="starter_python" data-hidden-input class="hidden">${python}</textarea>
+            <div data-cm-mount></div>
+          </div>
         </div>
         <div>
           <label class="block text-xs text-zinc-400 mb-1">Código inicial JavaScript</label>
-          <textarea name="starter_javascript" rows="6"
-            class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100 focus:outline-none focus:border-brand transition resize-none">${js}</textarea>
+          <div data-code-editor="javascript" class="rounded-lg overflow-hidden border border-zinc-700">
+            <textarea name="starter_javascript" data-hidden-input class="hidden">${js}</textarea>
+            <div data-cm-mount></div>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-zinc-400 mb-1">Código inicial TypeScript</label>
+          <div data-code-editor="typescript" class="rounded-lg overflow-hidden border border-zinc-700">
+            <textarea name="starter_typescript" data-hidden-input class="hidden">${ts}</textarea>
+            <div data-cm-mount></div>
+          </div>
         </div>
       </div>
 
@@ -134,7 +156,7 @@ function buildEditFormHtml(problem) {
   `;
 }
 
-function renderView(container, state) {
+function renderViewHtml(container, state) {
   if (state.loading) {
     container.innerHTML = `${adminNav("problems")}<div class="p-8">${spinner("lg")}</div>`;
     return;
@@ -189,17 +211,29 @@ export async function adminEditProblemView(container, params = {}) {
   };
 
   let isMounted = true;
+  let editorCleanup = null;
+
+  async function renderView(st) {
+    if (editorCleanup) {
+      editorCleanup();
+      editorCleanup = null;
+    }
+    renderViewHtml(container, st);
+    if (st.problem && !st.loading) {
+      editorCleanup = await mountAdminFormEditors(container);
+    }
+  }
 
   async function loadProblem() {
     if (!problemId) {
       state.loading = false;
       state.loadError = "ID de ejercicio no especificado.";
-      renderView(container, state);
+      await renderView(state);
       return;
     }
 
     state.loading = true;
-    renderView(container, state);
+    await renderView(state);
 
     try {
       const problems = await api.admin.problems();
@@ -212,7 +246,7 @@ export async function adminEditProblemView(container, params = {}) {
     } finally {
       if (!isMounted) return;
       state.loading = false;
-      renderView(container, state);
+      await renderView(state);
     }
   }
 
@@ -240,6 +274,7 @@ export async function adminEditProblemView(container, params = {}) {
         starter_code: {
           python: String(formData.get("starter_python") || "").trimEnd(),
           javascript: String(formData.get("starter_javascript") || "").trimEnd(),
+          typescript: String(formData.get("starter_typescript") || "").trimEnd(),
         },
         stages: parseStagesJson(formData.get("stages_json")),
         stages_count: 1,
@@ -257,11 +292,11 @@ export async function adminEditProblemView(container, params = {}) {
       state.problem = updated;
       state.error = null;
       showToast("Ejercicio actualizado correctamente.", "success");
-      renderView(container, state);
+      await renderView(state);
     } catch (error) {
       if (!isMounted) return;
       state.error = error?.message || "No se pudo actualizar el ejercicio.";
-      renderView(container, state);
+      await renderView(state);
     } finally {
       releaseButton();
     }
@@ -277,6 +312,7 @@ export async function adminEditProblemView(container, params = {}) {
 
   return () => {
     isMounted = false;
+    if (editorCleanup) editorCleanup();
     container.removeEventListener("click", onClick);
     container.removeEventListener("submit", onSubmit);
   };

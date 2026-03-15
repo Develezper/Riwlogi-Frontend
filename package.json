@@ -8,9 +8,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest",
+    "test": "bun test tests/unit --preload ./tests/setup.js",
+    "test:coverage": "bun test tests/unit --preload ./tests/setup.js --coverage",
+    "test:watch": "bun test tests/unit --preload ./tests/setup.js --watch",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "lint": "eslint --concurrency=auto .",
@@ -26,16 +26,16 @@
     ]
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.1.18",
     "@eslint/js": "^10.0.1",
+    "@happy-dom/global-registrator": "^20.8.4",
     "@playwright/test": "^1.58.2",
+    "@tailwindcss/vite": "^4.1.18",
     "eslint": "^10.0.0",
+    "happy-dom": "^20.8.4",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.6",
     "tailwindcss": "^4.1.18",
-    "vite": "8.0.0-beta.0",
-    "vitest": "^3.2.4",
-    "jsdom": "^27.0.1"
+    "vite": "8.0.0-beta.0"
   },
   "overrides": {
     "vite": "8.0.0-beta.0",

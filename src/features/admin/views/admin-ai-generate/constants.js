@@ -2,6 +2,7 @@ export const DEFAULT_BATCH_COUNT = 3;
 export const MAX_BATCH_COUNT = 12;
 export const MAX_UNIQUE_ATTEMPTS = 4;
 export const MAX_UNIQUE_TITLE_REFERENCES = 6;
+export const PARALLEL_BATCH_SIZE = 2;
 
 export const NUMBER_WORDS = Object.freeze({
   un: 1,

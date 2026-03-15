@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { buildUpdatePayloadFromProblem } from "../../src/features/admin/views/admin-ai-generate/form-utils.js";
 
