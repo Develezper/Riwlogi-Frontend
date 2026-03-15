@@ -4,6 +4,7 @@ import { adminNav } from "../components/admin-nav.js";
 import {
   difficultyLabel,
   formatDateTime,
+  formatDuration,
   activityTypeLabel,
   statusBadge,
   sourceBadge,
@@ -74,6 +75,8 @@ function renderView(container, state) {
                 <th class="py-2 pr-3 font-medium">Estado</th>
                 <th class="py-2 pr-3 font-medium">Dificultad</th>
                 <th class="py-2 pr-3 font-medium">Envíos</th>
+                <th class="py-2 pr-3 font-medium">Aceptación</th>
+                <th class="py-2 pr-3 font-medium">Tiempo prom.</th>
                 <th class="py-2 pr-3 font-medium">Actualizado</th>
                 <th class="py-2 font-medium">Acciones</th>
               </tr>
@@ -94,6 +97,8 @@ function renderView(container, state) {
                         <td class="py-3 pr-3">${statusBadge(p.status)}</td>
                         <td class="py-3 pr-3 text-zinc-300">${escapeHtml(difficultyLabel(p.difficulty))}</td>
                         <td class="py-3 pr-3 text-zinc-300">${escapeHtml(String(p.submissions || 0))}</td>
+                        <td class="py-3 pr-3 text-zinc-300">${escapeHtml(`${Number(p.acceptance || 0).toFixed(1)}%`)}</td>
+                        <td class="py-3 pr-3 text-zinc-300">${escapeHtml(formatDuration(p.avg_solve_time_ms))}</td>
                         <td class="py-3 pr-3 text-zinc-500 text-xs">${escapeHtml(formatDateTime(p.updated_at))}</td>
                         <td class="py-3" onclick="event.stopPropagation()">
                           <div class="flex items-center gap-2">
@@ -105,7 +110,7 @@ function renderView(container, state) {
                     `,
                       )
                       .join("")
-                  : `<tr><td colspan="7" class="py-8 text-center text-zinc-500 text-sm">No hay ejercicios aún.</td></tr>`
+                  : `<tr><td colspan="9" class="py-8 text-center text-zinc-500 text-sm">No hay ejercicios aún.</td></tr>`
               }
             </tbody>
           </table>
@@ -128,8 +133,12 @@ function renderView(container, state) {
                 <p class="text-[10px] text-zinc-500 mt-1">Envíos totales</p>
               </div>
               <div class="rounded-lg border border-zinc-800 p-3 text-center">
-                <p class="text-xl font-bold text-zinc-100">${escapeHtml(`${Number(selected.acceptance || 0).toFixed(0)}%`)}</p>
-                <p class="text-[10px] text-zinc-500 mt-1">Tasa acept.</p>
+                <p class="text-xl font-bold text-zinc-100">${escapeHtml(`${Number(selected.acceptance || 0).toFixed(1)}%`)}</p>
+                <p class="text-[10px] text-zinc-500 mt-1">Tasa de aceptación</p>
+              </div>
+              <div class="rounded-lg border border-zinc-800 p-3 text-center col-span-2">
+                <p class="text-xl font-bold text-zinc-100">${escapeHtml(formatDuration(selected.avg_solve_time_ms))}</p>
+                <p class="text-[10px] text-zinc-500 mt-1">Tiempo promedio de resolución</p>
               </div>
             </div>
             <div class="space-y-2">
@@ -213,7 +222,7 @@ export async function adminProblemsView(container) {
       if (!window.confirm("¿Archivar este ejercicio? Dejará de ser visible para los usuarios."))
         return;
       try {
-        await api.admin.deleteProblem(problemId);
+        await api.admin.updateProblem(problemId, { status: "archived" });
         showToast("Ejercicio archivado.", "success");
         await loadData({ keepSelection: false });
       } catch (error) {

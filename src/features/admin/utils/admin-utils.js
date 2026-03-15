@@ -58,6 +58,22 @@ export function formatLastActive(value) {
   return formatted === "-" ? "Sin actividad" : formatted;
 }
 
+export function formatDuration(value) {
+  const durationMs = Number(value || 0);
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return "-";
+
+  const totalSeconds = Math.round(durationMs / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
 export function activityTypeLabel(value) {
   const raw = String(value || "").trim();
   if (!raw) return "Actividad";

@@ -1,7 +1,7 @@
 import { api } from "../../../shared/services/api/index.js";
 import { escapeHtml, showToast, spinner } from "../../../shared/utils/ui-helpers.js";
 import { adminNav } from "../components/admin-nav.js";
-import { activityTypeLabel, formatDateTime, kpiCard } from "../utils/admin-utils.js";
+import { activityTypeLabel, formatDateTime, formatDuration, kpiCard } from "../utils/admin-utils.js";
 
 const POLL_INTERVAL = 30_000;
 
@@ -71,7 +71,11 @@ function renderDashboard(container, state) {
         ${kpiCard("Usuarios", kpis.total_users || 0, `${kpis.active_users_7d || 0} activos en 7 días`)}
         ${kpiCard("Problemas", kpis.total_problems || 0, `${kpis.published_problems || 0} publicados`)}
         ${kpiCard("Envíos", kpis.total_submissions || 0, `${kpis.accepted_submissions || 0} aceptados`)}
-        ${kpiCard("Aceptación", `${Number(kpis.acceptance_rate || 0).toFixed(1)}%`, `${kpis.ai_generated_problems || 0} generados por IA`)}
+        ${kpiCard(
+          "Aceptación",
+          `${Number(kpis.acceptance_rate || 0).toFixed(1)}%`,
+          `${kpis.ai_generated_problems || 0} generados por IA · ${formatDuration(kpis.avg_resolution_time_ms)} promedio`,
+        )}
       </div>
 
       <div class="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-6">
