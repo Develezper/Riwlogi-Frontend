@@ -423,6 +423,21 @@ body[data-theme] .border-zinc-800\/60 { border-color: var(--theme-border-800-60)
   font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
 }
 
+.cm-tooltip-autocomplete {
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 13px;
+}
+
+.cm-tooltip-autocomplete ul li[aria-selected] {
+  background: #2563eb !important;
+}
+
+.cm-completionDetail {
+  font-style: italic;
+  opacity: 0.7;
+  margin-left: 8px;
+}
+
 /* Markdown rendered content  */
 .prose-content h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--theme-prose-heading); }
 .prose-content h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--theme-prose-heading); }
@@ -482,4 +497,8 @@ body[data-theme] .border-zinc-800\/60 { border-color: var(--theme-border-800-60)
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+@view-transition {
+  navigation: auto;
 }

@@ -1,5 +1,5 @@
 import { api } from "../../../shared/services/api/index.js";
-import { spinner } from "../../../shared/utils/ui-helpers.js";
+import { spinner, withViewTransition } from "../../../shared/utils/ui-helpers.js";
 
 const FILTERS = [
   { id: "today", label: "Hoy" },
@@ -72,7 +72,7 @@ export async function leaderboardView(container) {
                 : "from-amber-700/20 to-amber-700/5 border-amber-700/30";
 
             return `
-              <div class="${order} relative overflow-hidden rounded-xl border bg-gradient-to-b ${color} p-6">
+              <div class="${order} relative overflow-hidden rounded-xl border bg-gradient-to-b ${color} p-6" style="view-transition-name: lb-${entry.username}">
                 <div class="flex flex-col items-center text-center">
                   <div class="w-16 h-16 rounded-full bg-zinc-900/70 border border-zinc-700 flex items-center justify-center text-xl font-bold text-white mb-3">
                     ${entry.avatar || entry.username[0].toUpperCase()}
@@ -105,7 +105,7 @@ export async function leaderboardView(container) {
             (entry, index) => `
           <div class="flex items-center gap-3 border-b border-zinc-800 px-4 py-3 sm:grid sm:grid-cols-[56px_1fr_120px_90px_90px] sm:gap-4 ${
             index === rest.length - 1 ? "border-b-0" : ""
-          }">
+          }" style="view-transition-name: lb-${entry.username}">
             <span class="w-8 h-8 rounded-full bg-zinc-800 text-zinc-300 text-xs font-semibold flex items-center justify-center sm:mx-auto">${
               entry.rank
             }</span>
@@ -135,7 +135,7 @@ export async function leaderboardView(container) {
       const entries = await api.leaderboard.get({ timeframe: state.timeframe });
       if (isDisposed) return;
       state.entries = entries;
-      renderContent();
+      withViewTransition(() => renderContent());
     } catch (error) {
       if (isDisposed) return;
       contentEl.innerHTML = `

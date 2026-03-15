@@ -1,6 +1,7 @@
 import { store } from "../state/session-store.js";
 import { router } from "../../app/router.js";
 import { api } from "../services/api/index.js";
+import { withViewTransition } from "../utils/ui-helpers.js";
 
 const publicLinks = [
   { path: "problems", label: "Problemas" },
@@ -26,7 +27,9 @@ function getStoredTheme() {
 
 function applyTheme(themeValue) {
   const resolved = themes.some((theme) => theme.value === themeValue) ? themeValue : "dark-modern";
-  document.body.dataset.theme = resolved;
+  withViewTransition(() => {
+    document.body.dataset.theme = resolved;
+  });
   window.localStorage.setItem(THEME_KEY, resolved);
   return resolved;
 }
@@ -43,7 +46,7 @@ function applyFocus(enabled) {
 }
 
 function focusButtonLabel(isOn) {
-  return isOn ? "Salir Fokus" : "Modo Fokus";
+  return isOn ? "Salir Focus" : "Modo Focus";
 }
 
 function renderFocusFab(currentTheme, focusOn) {
@@ -65,9 +68,9 @@ function renderFocusFab(currentTheme, focusOn) {
   fab.innerHTML = `
     <div class="focus-fab-panel">
       <button id="focus-fab-toggle" class="focus-fab-toggle" aria-haspopup="true" aria-expanded="false">
-        Fokus
+        Focus
       </button>
-      <div id="focus-fab-menu" class="focus-fab-menu" role="menu" aria-label="Menú de Fokus">
+      <div id="focus-fab-menu" class="focus-fab-menu" role="menu" aria-label="Menú de Focus">
         <div class="focus-fab-title">Temas</div>
         ${themes
           .map(
@@ -80,7 +83,7 @@ function renderFocusFab(currentTheme, focusOn) {
           .join("")}
         <div class="focus-fab-divider"></div>
         <button type="button" class="focus-fab-item focus-fab-exit" data-exit="true" role="menuitem">
-          Salir Fokus
+          Salir Focus
         </button>
       </div>
     </div>

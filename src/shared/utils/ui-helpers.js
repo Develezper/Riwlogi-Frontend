@@ -39,6 +39,14 @@ marked.setOptions({
   async: false,
 });
 
+export function withViewTransition(callback) {
+  if (document.startViewTransition) {
+    document.startViewTransition(callback);
+  } else {
+    callback();
+  }
+}
+
 export function difficultyBadge(difficulty) {
   const map = {
     1: { label: "Fácil", class: "badge-easy" },

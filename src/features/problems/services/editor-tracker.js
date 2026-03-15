@@ -39,6 +39,18 @@ export class EditorTracker {
     this._push("focus", { focused: Boolean(isFocused) });
   }
 
+  onCopyAttempt() {
+    this._push("copy_attempt", {});
+  }
+
+  onVisibilityChange(visible) {
+    this._push("visibility", { visible: Boolean(visible) });
+  }
+
+  onPrintAttempt() {
+    this._push("print_attempt", {});
+  }
+
   onFlush(callback) {
     this.flushCallback = callback;
   }
