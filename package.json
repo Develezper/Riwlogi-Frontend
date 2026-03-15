@@ -13,20 +13,35 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "lint": "eslint .",
+    "lint": "eslint --concurrency=auto .",
+    "lint:fix": "eslint --concurrency=auto --fix .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "ci": "bun run lint && bun run test && bun run build"
+    "ci": "bun run lint && bun run test && bun run build",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs}": [
+      "eslint --concurrency=auto --fix"
+    ]
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
     "eslint": "^10.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.6",
     "tailwindcss": "^4.1.18",
-    "vite": "^7.3.1",
+    "vite": "8.0.0-beta.0",
     "vitest": "^3.2.4",
     "jsdom": "^27.0.1"
+  },
+  "overrides": {
+    "vite": "8.0.0-beta.0",
+    "@codemirror/language": "6.12.2",
+    "@codemirror/state": "6.5.4",
+    "@codemirror/view": "6.39.14"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.4",
@@ -35,6 +50,7 @@
     "@codemirror/theme-one-dark": "^6.1.3",
     "@codemirror/view": "^6.39.14",
     "codemirror": "^6.0.2",
+    "gsap": "^3.14.2",
     "marked": "^17.0.2"
   }
 }

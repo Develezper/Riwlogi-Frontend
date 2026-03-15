@@ -424,6 +424,12 @@ export function parseSubmissionSubmitResponse(payload) {
   return {
     verdict: assertString(value.verdict || "pending", "submission_submit.verdict"),
     final_score: Number(value.final_score || 0),
+    classification: value.classification
+      ? {
+          label: assertString(value.classification.label, "submission_submit.classification.label"),
+          confidence: Number(value.classification.confidence || 0),
+        }
+      : null,
   };
 }
 

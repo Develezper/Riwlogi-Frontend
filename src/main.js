@@ -14,6 +14,7 @@ if (app) {
         aria-live="polite"
         aria-atomic="true"
       ></div>
+      <div id="focus-fab" class="hidden" aria-live="polite"></div>
     </div>
   `;
 }

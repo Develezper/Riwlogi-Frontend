@@ -1,6 +1,6 @@
 import { problemCard } from "../components/problem-card.js";
 import { api } from "../../../shared/services/api/index.js";
-import { spinner } from "../../../shared/utils/ui-helpers.js";
+import { spinner, withViewTransition } from "../../../shared/utils/ui-helpers.js";
 
 function normalizeProblemStatus(status) {
   return String(status || "")
@@ -99,17 +99,17 @@ export async function problemsHomeView(container) {
 
   const onSearch = (event) => {
     state.search = event.target.value;
-    renderList();
+    withViewTransition(() => renderList());
   };
 
   const onDifficulty = (event) => {
     state.difficulty = event.target.value;
-    renderList();
+    withViewTransition(() => renderList());
   };
 
   const onTag = (event) => {
     state.tag = event.target.value;
-    renderList();
+    withViewTransition(() => renderList());
   };
 
   searchInput.addEventListener("input", onSearch);

@@ -10,6 +10,7 @@ export function problemCard(problem) {
 
   return `
     <a href="#/problem/${problem.slug}"
+       style="view-transition-name: problem-${problem.slug}"
        class="block p-4 rounded-xl border border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900 transition group">
       <div class="flex items-start justify-between gap-3 mb-2">
         <div>
