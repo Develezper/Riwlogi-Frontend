@@ -13,6 +13,22 @@ function formatDate(value) {
   return date.toLocaleDateString("es-CO", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function formatDuration(durationMs) {
+  const ms = Number(durationMs || 0);
+  if (!Number.isFinite(ms) || ms <= 0) return "-";
+
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
 export async function profileView(container) {
   container.innerHTML = spinner("lg");
 
@@ -34,7 +50,7 @@ export async function profileView(container) {
 function renderProfile(container, profile, submissions) {
   const user = profile.user;
   const stats = profile.stats;
-  const totalProblems = 150;
+  const totalProblems = Math.max(1, Number(stats.total_problems || 0));
   const solvedPercent = Math.min(100, Math.round((stats.solved / totalProblems) * 100));
 
   container.innerHTML = `
@@ -48,7 +64,7 @@ function renderProfile(container, profile, submissions) {
           <div class="mt-2 flex flex-wrap gap-4 text-sm text-zinc-400">
             <span>${user.email}</span>
             <span>Se unió el ${formatDate(user.created_at)}</span>
-            <span>Posición #${profile.rank || "-"}</span>
+            <span>Posición #${profile.rank || "-"} de ${profile.total_users || "-"}</span>
             <span>${profile.streak || 0} días de racha</span>
           </div>
         </div>
@@ -104,11 +120,12 @@ function renderProfile(container, profile, submissions) {
       <div>
         <h2 class="text-lg font-semibold text-zinc-100 mb-4">Envíos recientes</h2>
         <div class="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50">
-          <div class="hidden sm:grid grid-cols-[1fr_130px_95px_90px_100px] items-center gap-4 border-b border-zinc-800 bg-zinc-900 px-4 py-3 text-xs font-medium uppercase tracking-wide text-zinc-500">
+          <div class="hidden sm:grid grid-cols-[1fr_130px_95px_90px_95px_100px] items-center gap-4 border-b border-zinc-800 bg-zinc-900 px-4 py-3 text-xs font-medium uppercase tracking-wide text-zinc-500">
             <span>Problema</span>
             <span>Estado</span>
             <span class="text-right">Lenguaje</span>
             <span class="text-right">Puntaje</span>
+            <span class="text-right">Tiempo</span>
             <span class="text-right">Fecha</span>
           </div>
 
@@ -118,7 +135,7 @@ function renderProfile(container, profile, submissions) {
                   .map((submission, index) => {
                     const config = verdictConfig[submission.verdict] || verdictConfig.pending;
                     return `
-                    <div class="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_130px_95px_90px_100px] sm:items-center sm:gap-4 px-4 py-3 border-b border-zinc-800 ${
+                    <div class="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_130px_95px_90px_95px_100px] sm:items-center sm:gap-4 px-4 py-3 border-b border-zinc-800 ${
                       index === submissions.length - 1 ? "border-b-0" : ""
                     }">
                       <a href="#/problem/${submission.problem_id}" class="text-sm font-medium text-zinc-100 hover:text-brand transition">
@@ -129,6 +146,7 @@ function renderProfile(container, profile, submissions) {
                       </div>
                       <span class="sm:text-right text-xs text-zinc-400 uppercase">${submission.language}</span>
                       <span class="sm:text-right text-sm font-semibold text-zinc-200">${submission.final_score}</span>
+                      <span class="sm:text-right text-xs text-zinc-400">${formatDuration(submission.solve_duration_ms)}</span>
                       <span class="sm:text-right text-xs text-zinc-500">${formatDate(submission.submitted_at)}</span>
                     </div>
                   `;

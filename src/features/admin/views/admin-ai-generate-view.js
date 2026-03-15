@@ -6,6 +6,7 @@ import {
   DEFAULT_BATCH_COUNT,
   MAX_BATCH_COUNT,
   MAX_UNIQUE_ATTEMPTS,
+  PARALLEL_BATCH_SIZE,
   clampInt,
 } from "./admin-ai-generate/constants.js";
 import { resolveDifficultyPlan } from "./admin-ai-generate/difficulty-plan.js";
@@ -31,6 +32,8 @@ import {
   normalizeGeneratedProblemCandidate,
 } from "./admin-ai-generate/generated-problem-utils.js";
 import { renderEditPhase, renderPromptPhase } from "./admin-ai-generate/render.js";
+import { saveDraft, loadDraft, clearDraft } from "./admin-ai-generate/draft-storage.js";
+import { mountAdminFormEditors } from "../utils/admin-form-editors.js";
 
 export async function adminAiGenerateView(container) {
   const state = {
@@ -45,15 +48,36 @@ export async function adminAiGenerateView(container) {
     generationCurrent: 0,
     generationTotal: 0,
     generationMessage: "",
+    restoredFromDraft: false,
   };
 
   let isMounted = true;
+  let editorCleanup = null;
 
-  function render() {
-    if (state.phase === "edit" && state.generatedProblem) {
+  const pendingDraft = loadDraft();
+  if (pendingDraft) {
+    state.phase = "edit";
+    state.lastPrompt = pendingDraft.lastPrompt || "";
+    state.generatedBatch = pendingDraft.generatedBatch;
+    state.generatedProblem =
+      pendingDraft.generatedBatch.find((p) => p.id === pendingDraft.activeProblemId) ||
+      pendingDraft.generatedBatch[0] ||
+      null;
+    state.restoredFromDraft = true;
+  }
+
+  async function render() {
+    if (editorCleanup) {
+      editorCleanup();
+      editorCleanup = null;
+    }
+    if (state.phase === "edit") {
       renderEditPhase(container, state);
     } else {
       renderPromptPhase(container, state);
+    }
+    if (state.phase === "edit" && state.generatedProblem) {
+      editorCleanup = await mountAdminFormEditors(container);
     }
   }
 
@@ -86,10 +110,13 @@ export async function adminAiGenerateView(container) {
         state.isGenerating = true;
         state.generationCurrent = 0;
         state.generationTotal = batchCount;
+        state.generatedBatch = [];
+        state.generatedProblem = null;
+        state.phase = "edit";
         state.generationMessage = "Analizando prompt y preparando generación…";
         render();
 
-        for (let index = 0; index < batchCount; index += 1) {
+        async function generateSingleProblem(index) {
           const difficulty = Array.isArray(difficultyPlan) ? difficultyPlan[index] || 2 : null;
           let created = null;
           let lastDuplicateReason = null;
@@ -106,13 +133,6 @@ export async function adminAiGenerateView(container) {
               existingProblems: createdProblems,
               attempt,
             });
-
-            state.generationCurrent = index;
-            state.generationMessage =
-              attempt === 1
-                ? `Generando ejercicio ${index + 1} de ${batchCount}…`
-                : `Evitando duplicado en ejercicio ${index + 1} (intento ${attempt}/${MAX_UNIQUE_ATTEMPTS})…`;
-            render();
 
             const candidate = await api.admin.generateProblem({ prompt: composedPrompt });
             const sanitizedCandidate = normalizeGeneratedProblemCandidate(candidate, {
@@ -146,11 +166,44 @@ export async function adminAiGenerateView(container) {
             );
           }
 
-          createdProblems.push(created);
+          return { index, problem: created };
+        }
 
-          state.generationCurrent = index + 1;
-          state.generationMessage = `Ejercicio ${index + 1} generado correctamente.`;
+        for (let chunkStart = 0; chunkStart < batchCount; chunkStart += PARALLEL_BATCH_SIZE) {
+          const chunkEnd = Math.min(chunkStart + PARALLEL_BATCH_SIZE, batchCount);
+          const chunkIndices = [];
+          for (let i = chunkStart; i < chunkEnd; i += 1) chunkIndices.push(i);
+
+          state.generationMessage =
+            chunkEnd - chunkStart > 1
+              ? `Generando ejercicios ${chunkStart + 1}–${chunkEnd} de ${batchCount}…`
+              : `Generando ejercicio ${chunkStart + 1} de ${batchCount}…`;
           render();
+
+          const results = await Promise.allSettled(
+            chunkIndices.map((index) => generateSingleProblem(index)),
+          );
+
+          for (const result of results) {
+            if (result.status === "fulfilled") {
+              const { problem } = result.value;
+              createdProblems.push(problem);
+              state.generatedBatch = [...createdProblems];
+              if (!state.generatedProblem) {
+                state.generatedProblem = problem;
+              }
+            }
+          }
+
+          state.generationCurrent = createdProblems.length;
+          state.generationMessage = `${createdProblems.length} de ${batchCount} generados.`;
+          if (createdProblems.length > 0) saveDraft(state);
+          render();
+
+          const failures = results.filter((r) => r.status === "rejected");
+          if (failures.length > 0 && createdProblems.length === 0) {
+            throw failures[0].reason;
+          }
         }
 
         if (!isMounted) return;
@@ -163,13 +216,13 @@ export async function adminAiGenerateView(container) {
         state.generationTotal = 0;
         state.generationMessage = "";
         state.generatedBatch = createdProblems;
-        state.generatedProblem = createdProblems[0];
-        state.phase = "edit";
+        state.generatedProblem = state.generatedProblem || createdProblems[0];
         state.savedProblemId = null;
+        saveDraft(state);
         render();
 
-        if (batchCount > 1) {
-          showToast(`${batchCount} ejercicios generados. Selecciona uno para editar.`, "success");
+        if (createdProblems.length > 1) {
+          showToast(`${createdProblems.length} ejercicios generados. Selecciona uno para editar.`, "success");
         } else {
           showToast("Ejercicio generado. Revisa los datos y guarda.", "success");
         }
@@ -182,13 +235,15 @@ export async function adminAiGenerateView(container) {
         state.generationMessage = "";
         if (createdProblems.length > 0) {
           state.generatedBatch = createdProblems;
-          state.generatedProblem = createdProblems[0];
-          state.phase = "edit";
+          state.generatedProblem = state.generatedProblem || createdProblems[0];
           state.savedProblemId = null;
           state.error = `${error?.message || "Hubo un error durante la generación."} Se generaron ${createdProblems.length} ejercicio(s).`;
           render();
           showToast("Generación parcial completada. Revisa los ejercicios creados.", "error");
         } else {
+          state.phase = "prompt";
+          state.generatedProblem = null;
+          state.generatedBatch = [];
           state.error = error?.message || "No se pudo generar el ejercicio.";
           render();
         }
@@ -214,6 +269,7 @@ export async function adminAiGenerateView(container) {
         state.generatedProblem = updated;
         state.generatedBatch = upsertProblemInBatch(state.generatedBatch, updated);
         state.savedProblemId = updated?.id || problemId;
+        clearDraft();
 
         showToast("Ejercicio guardado. Redirigiendo al catálogo…", "success");
         goToProblemsCatalog();
@@ -235,11 +291,13 @@ export async function adminAiGenerateView(container) {
 
     const trigger = event.target.closest("[data-action]");
     if (!trigger || !container.contains(trigger)) return;
-    if (state.isGenerating) return;
 
     const action = trigger.dataset.action;
 
+    if (state.isGenerating && action !== "select-generated") return;
+
     if (action === "back-to-prompt") {
+      clearDraft();
       state.phase = "prompt";
       state.error = null;
       state.generatedProblem = null;
@@ -295,6 +353,7 @@ export async function adminAiGenerateView(container) {
 
         const successCount = updatedBatch.length - failedCount;
         if (failedCount === 0) {
+          clearDraft();
           showToast(
             targetStatus === "published"
               ? `Se publicaron ${successCount} ejercicios. Redirigiendo al catálogo…`
@@ -320,12 +379,15 @@ export async function adminAiGenerateView(container) {
     if (action === "select-generated") {
       const problemId = String(trigger.dataset.problemId || "").trim();
       if (!problemId) return;
-      try {
-        syncCurrentFormIntoState(state, container);
-      } catch (error) {
-        state.error = error?.message || "Corrige el formulario actual antes de cambiar.";
-        render();
-        return;
+      if (state.generatedProblem && !state.isGenerating) {
+        try {
+          syncCurrentFormIntoState(state, container);
+          saveDraft(state);
+        } catch (error) {
+          state.error = error?.message || "Corrige el formulario actual antes de cambiar.";
+          render();
+          return;
+        }
       }
       const selected = (state.generatedBatch || []).find((problem) => problem.id === problemId);
       if (!selected) return;
@@ -343,6 +405,7 @@ export async function adminAiGenerateView(container) {
 
   return () => {
     isMounted = false;
+    if (editorCleanup) editorCleanup();
     container.removeEventListener("submit", onSubmit);
     container.removeEventListener("click", onClick);
   };

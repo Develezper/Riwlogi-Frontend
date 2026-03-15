@@ -3,6 +3,27 @@ import { escapeHtml, showToast, spinner } from "../../../shared/utils/ui-helpers
 import { adminNav } from "../components/admin-nav.js";
 import { roleLabel, formatLastActive, kpiCard } from "../utils/admin-utils.js";
 
+const PAGE_SIZE_OPTIONS = [10, 20, 40];
+
+function paginate(items, page, pageSize) {
+  const safeSize = Number.isFinite(pageSize) && pageSize > 0 ? pageSize : PAGE_SIZE_OPTIONS[1];
+  const totalItems = Array.isArray(items) ? items.length : 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / safeSize));
+  const safePage = Math.min(Math.max(1, Number(page) || 1), totalPages);
+  const start = (safePage - 1) * safeSize;
+  const end = start + safeSize;
+
+  return {
+    items: items.slice(start, end),
+    page: safePage,
+    pageSize: safeSize,
+    totalItems,
+    totalPages,
+    rangeStart: totalItems ? start + 1 : 0,
+    rangeEnd: totalItems ? Math.min(end, totalItems) : 0,
+  };
+}
+
 function renderView(container, state) {
   if (state.loading) {
     container.innerHTML = `${adminNav("users")}<div class="p-8">${spinner("lg")}</div>`;
@@ -10,6 +31,10 @@ function renderView(container, state) {
   }
 
   const users = Array.isArray(state.users) ? state.users : [];
+  const pagination = paginate(users, state.page, state.pageSize);
+  state.page = pagination.page;
+  state.pageSize = pagination.pageSize;
+  const pageUsers = pagination.items;
   const totalAdmins = users.filter((u) => u.is_admin || u.role === "admin").length;
   const activeRecently = users.filter((u) => {
     if (!u.last_active_at) return false;
@@ -52,8 +77,8 @@ function renderView(container, state) {
           </thead>
           <tbody>
             ${
-              users.length
-                ? users
+              pageUsers.length
+                ? pageUsers
                     .map(
                       (user) => `
                     <tr class="border-b border-zinc-800/60">
@@ -86,13 +111,31 @@ function renderView(container, state) {
             }
           </tbody>
         </table>
+        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-xs text-zinc-500">Mostrando ${escapeHtml(String(pagination.rangeStart))}-${escapeHtml(String(pagination.rangeEnd))} de ${escapeHtml(String(pagination.totalItems))} usuarios</p>
+          <div class="flex flex-wrap items-center gap-2">
+            <label for="admin-users-page-size" class="text-xs text-zinc-500">Filas</label>
+            <select id="admin-users-page-size" data-action="page-size" class="px-2 py-1 rounded-md border border-zinc-700 bg-zinc-900 text-zinc-200 text-xs">
+              ${PAGE_SIZE_OPTIONS.map((size) => `<option value="${size}" ${size === state.pageSize ? "selected" : ""}>${size}</option>`).join("")}
+            </select>
+            <button data-action="page-prev" class="px-3 py-1 rounded-md border border-zinc-700 text-zinc-200 text-xs disabled:opacity-40" ${pagination.page <= 1 ? "disabled" : ""}>Anterior</button>
+            <span class="text-xs text-zinc-400">Página ${escapeHtml(String(pagination.page))} de ${escapeHtml(String(pagination.totalPages))}</span>
+            <button data-action="page-next" class="px-3 py-1 rounded-md border border-zinc-700 text-zinc-200 text-xs disabled:opacity-40" ${pagination.page >= pagination.totalPages ? "disabled" : ""}>Siguiente</button>
+          </div>
+        </div>
       </div>
     </section>
   `;
 }
 
 export async function adminUsersView(container) {
-  const state = { loading: true, error: null, users: [] };
+  const state = {
+    loading: true,
+    error: null,
+    users: [],
+    page: 1,
+    pageSize: PAGE_SIZE_OPTIONS[1],
+  };
   let isMounted = true;
 
   async function loadData() {
@@ -127,6 +170,18 @@ export async function adminUsersView(container) {
       return;
     }
 
+    if (action === "page-prev") {
+      state.page = Math.max(1, state.page - 1);
+      renderView(container, state);
+      return;
+    }
+
+    if (action === "page-next") {
+      state.page += 1;
+      renderView(container, state);
+      return;
+    }
+
     if (action === "delete-user") {
       const userId = String(trigger.dataset.userId || "").trim();
       if (!userId) return;
@@ -146,11 +201,22 @@ export async function adminUsersView(container) {
     }
   };
 
+  const onChange = (event) => {
+    const trigger = event.target.closest("[data-action='page-size']");
+    if (!trigger || !container.contains(trigger)) return;
+    const nextSize = Number(trigger.value);
+    state.pageSize = PAGE_SIZE_OPTIONS.includes(nextSize) ? nextSize : PAGE_SIZE_OPTIONS[1];
+    state.page = 1;
+    renderView(container, state);
+  };
+
   container.addEventListener("click", onClick);
+  container.addEventListener("change", onChange);
   await loadData();
 
   return () => {
     isMounted = false;
     container.removeEventListener("click", onClick);
+    container.removeEventListener("change", onChange);
   };
 }
