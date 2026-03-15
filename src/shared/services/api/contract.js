@@ -75,6 +75,18 @@ function validateDifficulty(value, context) {
   return difficulty;
 }
 
+function normalizeProblemStatus(rawStatus, fallback = "published") {
+  const value = String(rawStatus || fallback)
+    .trim()
+    .toLowerCase();
+
+  if (value === "publicado") return "published";
+  if (value === "borrador") return "draft";
+  if (value === "archivado") return "archived";
+  if (value === "pendiente") return "pending";
+  return value;
+}
+
 function fallbackSingleStage(problemId = "problem") {
   return {
     id: `${problemId}-stage-1`,
@@ -117,6 +129,7 @@ function validateUser(raw, context = "user") {
 
 function validateProblemSummary(raw, index = 0) {
   const value = assertObject(raw, `problems.items[${index}]`);
+  const status = normalizeProblemStatus(value.status, "published");
 
   return {
     id: assertString(value.id, `problems.items[${index}].id`),
@@ -128,6 +141,7 @@ function validateProblemSummary(raw, index = 0) {
     ),
     acceptance: Number(value.acceptance || 0),
     submissions: Number(value.submissions || 0),
+    status,
     stages_count: 1,
   };
 }
@@ -337,7 +351,7 @@ function validateAdminUser(raw, index) {
 function validateAdminProblem(raw, index) {
   const value = assertObject(raw, `admin.problems.items[${index}]`);
   const problem = validateProblem(value);
-  const status = String(value.status || "draft");
+  const status = normalizeProblemStatus(value.status, "draft");
   const source = String(value.source || "custom");
 
   return {

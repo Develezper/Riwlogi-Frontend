@@ -3,6 +3,18 @@ import { api } from "../../../shared/services/api/index.js";
 import { EditorTracker } from "../services/editor-tracker.js";
 import { difficultyBadge, escapeHtml, renderMarkdown, showToast, spinner } from "../../../shared/utils/ui-helpers.js";
 
+function normalizeProblemStatus(status) {
+  return String(status || "")
+    .trim()
+    .toLowerCase();
+}
+
+function isPublicProblemStatus(status) {
+  const normalized = normalizeProblemStatus(status);
+  if (!normalized) return true;
+  return normalized === "published" || normalized === "publicado";
+}
+
 export async function problemSolverView(container, { slug }) {
   const state = {
     problem: null,
@@ -60,6 +72,9 @@ export async function problemSolverView(container, { slug }) {
 
   try {
     const problem = await api.problems.get(slug);
+    if (!isPublicProblemStatus(problem?.status)) {
+      throw new Error("Este ejercicio no esta disponible para usuarios.");
+    }
     if (disposed) return cleanup;
 
     state.problem = problem;

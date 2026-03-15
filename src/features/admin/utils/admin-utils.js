@@ -5,6 +5,10 @@ export const statusConfig = {
     label: "Publicado",
     className: "text-green-300 bg-green-500/10 border-green-500/30",
   },
+  pending: {
+    label: "Pendiente",
+    className: "text-yellow-300 bg-yellow-500/10 border-yellow-500/30",
+  },
   draft: {
     label: "Borrador",
     className: "text-amber-300 bg-amber-500/10 border-amber-500/30",

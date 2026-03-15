@@ -2,6 +2,18 @@ import { problemCard } from "../components/problem-card.js";
 import { api } from "../../../shared/services/api/index.js";
 import { spinner } from "../../../shared/utils/ui-helpers.js";
 
+function normalizeProblemStatus(status) {
+  return String(status || "")
+    .trim()
+    .toLowerCase();
+}
+
+function isUserVisibleProblem(problem) {
+  const status = normalizeProblemStatus(problem?.status);
+  if (!status) return true;
+  return status === "published" || status === "publicado";
+}
+
 export async function problemsHomeView(container) {
   const state = {
     problems: [],
@@ -61,8 +73,11 @@ export async function problemsHomeView(container) {
   const tagSelect = container.querySelector("#tag-select");
 
   try {
-    const [problems, tags] = await Promise.all([api.problems.list(), api.problems.tags()]);
-    state.problems = problems;
+    const [problems, tags] = await Promise.all([
+      api.problems.list({ status: "published" }),
+      api.problems.tags(),
+    ]);
+    state.problems = problems.filter(isUserVisibleProblem);
     state.tags = tags;
 
     tagSelect.innerHTML = [

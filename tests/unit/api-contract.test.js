@@ -27,6 +27,32 @@ describe("api contract parsers", () => {
     expect(() => parseProblemsListResponse([{ id: "x" }])).toThrow();
   });
 
+  it("normalizes status in problem list items", () => {
+    const parsed = parseProblemsListResponse({
+      items: [
+        {
+          id: "sum-two",
+          slug: "sum-two",
+          title: "Suma dos",
+          difficulty: 1,
+          tags: ["arrays"],
+          status: "pendiente",
+        },
+        {
+          id: "two-sum",
+          slug: "two-sum",
+          title: "Two Sum",
+          difficulty: 1,
+          tags: ["arrays"],
+          status: "published",
+        },
+      ],
+    });
+
+    expect(parsed[0].status).toBe("pending");
+    expect(parsed[1].status).toBe("published");
+  });
+
   it("parses strict problem response", () => {
     const parsed = parseProblemResponse({
       item: {
