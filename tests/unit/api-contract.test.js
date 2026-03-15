@@ -53,6 +53,22 @@ describe("api contract parsers", () => {
     expect(parsed[1].status).toBe("published");
   });
 
+  it("does not default missing status to published", () => {
+    const parsed = parseProblemsListResponse({
+      items: [
+        {
+          id: "legacy-problem",
+          slug: "legacy-problem",
+          title: "Legacy",
+          difficulty: 1,
+          tags: ["arrays"],
+        },
+      ],
+    });
+
+    expect(parsed[0].status).toBe("");
+  });
+
   it("parses strict problem response", () => {
     const parsed = parseProblemResponse({
       item: {

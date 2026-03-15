@@ -25,7 +25,6 @@ function normalizeProblemStatus(status) {
 
 function isPublicProblemStatus(status) {
   const normalized = normalizeProblemStatus(status);
-  if (!normalized) return true;
   return normalized === "published" || normalized === "publicado";
 }
 

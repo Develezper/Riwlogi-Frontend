@@ -10,7 +10,6 @@ function normalizeProblemStatus(status) {
 
 function isUserVisibleProblem(problem) {
   const status = normalizeProblemStatus(problem?.status);
-  if (!status) return true;
   return status === "published" || status === "publicado";
 }
 

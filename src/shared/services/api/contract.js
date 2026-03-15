@@ -75,7 +75,7 @@ function validateDifficulty(value, context) {
   return difficulty;
 }
 
-function normalizeProblemStatus(rawStatus, fallback = "published") {
+function normalizeProblemStatus(rawStatus, fallback = "") {
   const value = String(rawStatus || fallback)
     .trim()
     .toLowerCase();
@@ -129,7 +129,7 @@ function validateUser(raw, context = "user") {
 
 function validateProblemSummary(raw, index = 0) {
   const value = assertObject(raw, `problems.items[${index}]`);
-  const status = normalizeProblemStatus(value.status, "published");
+  const status = normalizeProblemStatus(value.status, "");
 
   return {
     id: assertString(value.id, `problems.items[${index}].id`),

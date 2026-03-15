@@ -10,6 +10,7 @@ import {
 } from "../utils/admin-utils.js";
 
 const POLL_INTERVAL = 15_000;
+const ADMIN_PROBLEMS_LIMIT = 100;
 
 function renderActivityFeed(problem, activity) {
   const slug = String(problem.slug || "").toLowerCase();
@@ -162,7 +163,10 @@ export async function adminProblemsView(container) {
       renderView(container, state);
     }
     try {
-      const [problems, overview] = await Promise.all([api.admin.problems(), api.admin.overview()]);
+      const [problems, overview] = await Promise.all([
+        api.admin.problems({ page: 1, limit: ADMIN_PROBLEMS_LIMIT }),
+        api.admin.overview(),
+      ]);
       if (!isMounted) return;
       state.problems = problems;
       state.activity = overview.recent_activity || [];
