@@ -1,4 +1,4 @@
-# Riwlog Frontend
+# Riwlogic Frontend
 
 Frontend SPA para retos de algoritmia por etapas.
 

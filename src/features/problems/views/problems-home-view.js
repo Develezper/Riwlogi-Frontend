@@ -47,7 +47,7 @@ export async function problemsHomeView(container) {
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
       <div class="text-center mb-8">
         <h1 class="text-3xl sm:text-4xl font-bold mb-3">
-          Desafíos <span class="text-brand">Riw</span>log
+          Desafíos <span class="text-brand">Riwlog</span>log
         </h1>
         <p class="text-zinc-400 text-lg max-w-2xl mx-auto">
           Resuelve problemas en una etapa única y demuestra tu proceso, no solo el resultado final.
