@@ -26,6 +26,12 @@ function linkClass(active) {
     : "px-3 py-1.5 rounded-md text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition";
 }
 
+function avatarLinkClass(active) {
+  return active
+    ? "ml-2 w-9 h-9 rounded-full border border-brand/60 bg-zinc-900/60 shadow-md overflow-hidden flex items-center justify-center"
+    : "ml-2 w-9 h-9 rounded-full border border-zinc-700 bg-zinc-900/60 hover:border-brand/60 transition overflow-hidden flex items-center justify-center";
+}
+
 function escapeHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")
@@ -33,6 +39,23 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function avatarSvgDataUrl(label) {
+  const safeLabel = escapeHtml(label || "U");
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#7c3aed"/>
+          <stop offset="100%" stop-color="#a78bfa"/>
+        </linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="32" fill="url(#g)"/>
+      <text x="32" y="40" text-anchor="middle" font-size="28" font-weight="700" fill="white" font-family="ui-sans-serif, system-ui">${safeLabel}</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 function setupMenuListeners(nav) {
@@ -91,6 +114,9 @@ export function renderNavbar() {
   const links = isAdmin ? [...publicLinks, { path: "admin", label: "Administración" }] : publicLinks;
   const activePath = currentPath();
   const showProfileLink = isAuth && !isAdmin;
+  const displayName = user?.display_name || user?.username || "Usuario";
+  const avatarInitial = String(displayName).trim()[0]?.toUpperCase() || "U";
+  const avatarSrc = avatarSvgDataUrl(avatarInitial);
 
   nav.className = "sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md";
 
@@ -125,8 +151,13 @@ export function renderNavbar() {
           ${
             showProfileLink
               ? `
-          <a href="#/profile" class="${linkClass(isActive("profile", activePath))}">
-            ${escapeHtml(user?.username || "Perfil")}
+          <a
+            href="#/profile"
+            class="${avatarLinkClass(isActive("profile", activePath))}"
+            aria-label="Ir al perfil"
+            title="${escapeHtml(displayName)}"
+          >
+            <img src="${avatarSrc}" alt="Avatar de ${escapeHtml(displayName)}" class="w-full h-full object-cover" />
           </a>
         `
               : ""
@@ -165,8 +196,13 @@ export function renderNavbar() {
           ${
             showProfileLink
               ? `
-          <a href="#/profile" class="${linkClass(isActive("profile", activePath))}">
-            ${escapeHtml(user?.username || "Perfil")}
+          <a
+            href="#/profile"
+            class="${avatarLinkClass(isActive("profile", activePath))}"
+            aria-label="Ir al perfil"
+            title="${escapeHtml(displayName)}"
+          >
+            <img src="${avatarSrc}" alt="Avatar de ${escapeHtml(displayName)}" class="w-full h-full object-cover" />
           </a>
         `
               : ""
