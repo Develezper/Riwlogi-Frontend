@@ -13,18 +13,18 @@ import { mountAdminFormEditors } from "../utils/admin-form-editors.js";
 function parseStagesJson(rawValue) {
   const text = String(rawValue ?? "").trim();
   if (!text) {
-    throw new Error("El JSON de etapas no puede estar vacío.");
+    throw new Error("Completa la sección de etapa y tests antes de guardar.");
   }
 
   let parsed;
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new Error("El JSON de etapas es inválido.");
+    throw new Error("Revisa la sección de etapa y tests antes de guardar.");
   }
 
   if (!Array.isArray(parsed)) {
-    throw new Error("El JSON de etapas debe ser un arreglo.");
+    throw new Error("No se pudo leer la configuración de la etapa.");
   }
 
   const firstStage = parsed[0] || {};
