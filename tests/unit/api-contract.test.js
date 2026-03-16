@@ -120,4 +120,35 @@ describe("api contract parsers", () => {
     expect(parsed.passed).toBe(true);
     expect(parsed.stage_score).toBe(90);
   });
+
+  it("uses hidden_tests length for hidden_count when count is missing", () => {
+    const parsed = parseProblemResponse({
+      item: {
+        id: "stack-count",
+        slug: "stack-count",
+        title: "Contador de pila",
+        difficulty: 1,
+        tags: ["pila"],
+        acceptance: 10,
+        submissions: 20,
+        statement_md: "Cuenta elementos",
+        starter_code: { python: "def solve(stack):\n    pass" },
+        stages: [
+          {
+            id: "stack-count-stage-1",
+            stage_index: 1,
+            prompt_md: "Etapa unica",
+            hidden_count: 0,
+            visible_tests: [{ input_text: "[1,2,3]", expected_text: "3" }],
+            hidden_tests: [
+              { input_text: "[]", expected_text: "0" },
+              { input_text: "[9]", expected_text: "1" },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(parsed.stages[0].hidden_count).toBe(2);
+  });
 });

@@ -15,16 +15,28 @@ function normalizeVisibleTests(rawTests) {
   }));
 }
 
+function normalizeHiddenTests(rawTests) {
+  const tests = Array.isArray(rawTests) ? rawTests : [];
+  return tests
+    .map((test) => ({
+      input_text: String(test?.input_text || "").trim(),
+      expected_text: String(test?.expected_text || "").trim(),
+    }))
+    .filter((test) => test.input_text && test.expected_text);
+}
+
 function normalizeSingleStage(rawStages) {
   const stages = Array.isArray(rawStages) ? rawStages : [];
   const stage = stages[0] || {};
   const tests = normalizeVisibleTests(stage.visible_tests);
+  const hiddenTests = normalizeHiddenTests(stage.hidden_tests);
 
   return {
     stage_index: 1,
     prompt_md: String(stage.prompt_md || ""),
-    hidden_count: toNonNegativeInt(stage.hidden_count, 0),
+    hidden_count: Math.max(toNonNegativeInt(stage.hidden_count, 0), hiddenTests.length),
     visible_tests: tests.length ? tests : [{ input_text: "", expected_text: "" }],
+    hidden_tests: hiddenTests,
   };
 }
 
@@ -32,17 +44,20 @@ function emptyTest() {
   return { input_text: "", expected_text: "" };
 }
 
-function buildTestRowHtml(test, testNumber) {
+function buildTestRowHtml(test, testNumber, options = {}) {
+  const type = String(options.type || "visible");
+  const title = type === "hidden" ? "Test oculto" : "Test visible";
   const inputText = escapeHtml(String(test?.input_text || ""));
   const expectedText = escapeHtml(String(test?.expected_text || ""));
 
   return `
-    <div data-stage-test class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3 space-y-2">
+    <div data-stage-test data-test-type="${type}" class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3 space-y-2">
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] text-zinc-500">Test visible <span data-test-number>${testNumber}</span></span>
+        <span class="text-[11px] text-zinc-500">${title} <span data-test-number>${testNumber}</span></span>
         <button
           type="button"
           data-stage-action="remove-test"
+          data-remove-type="${type}"
           class="px-2 py-1 rounded border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition text-[11px]">
           Quitar
         </button>
@@ -71,9 +86,11 @@ function buildTestRowHtml(test, testNumber) {
 
 function buildStageCardHtml(stage) {
   const prompt = escapeHtml(String(stage?.prompt_md || ""));
-  const hiddenCount = toNonNegativeInt(stage?.hidden_count, 0);
-  const tests = normalizeVisibleTests(stage?.visible_tests);
-  const safeTests = tests.length ? tests : [emptyTest()];
+  const hiddenTests = normalizeHiddenTests(stage?.hidden_tests);
+  const hiddenCount = Math.max(toNonNegativeInt(stage?.hidden_count, 0), hiddenTests.length);
+  const visibleTests = normalizeVisibleTests(stage?.visible_tests);
+  const safeVisibleTests = visibleTests.length ? visibleTests : [emptyTest()];
+  const safeHiddenTests = hiddenTests;
 
   return `
     <article data-stage-card class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
@@ -106,12 +123,33 @@ function buildStageCardHtml(stage) {
           <button
             type="button"
             data-stage-action="add-test"
+            data-add-type="visible"
             class="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition text-xs">
             + Agregar test visible
           </button>
         </div>
-        <div data-stage-tests class="space-y-2">
-          ${safeTests.map((test, testIndex) => buildTestRowHtml(test, testIndex + 1)).join("")}
+        <div data-stage-tests="visible" class="space-y-2">
+          ${safeVisibleTests
+            .map((test, testIndex) => buildTestRowHtml(test, testIndex + 1, { type: "visible" }))
+            .join("")}
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-xs text-zinc-400">Tests ocultos (solo admin)</p>
+          <button
+            type="button"
+            data-stage-action="add-test"
+            data-add-type="hidden"
+            class="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition text-xs">
+            + Agregar test oculto
+          </button>
+        </div>
+        <div data-stage-tests="hidden" class="space-y-2">
+          ${safeHiddenTests
+            .map((test, testIndex) => buildTestRowHtml(test, testIndex + 1, { type: "hidden" }))
+            .join("")}
         </div>
       </div>
     </article>
@@ -133,9 +171,20 @@ function readStageFromEditor(editorRoot) {
   const stageCard = editorRoot.querySelector("[data-stage-card]");
   if (!stageCard) return normalizeSingleStage([]);
 
+  const jsonField = editorRoot.querySelector("[data-stage-json]");
+  let preservedHiddenTests = [];
+  try {
+    const parsed = JSON.parse(String(jsonField?.value || "[]"));
+    preservedHiddenTests = normalizeHiddenTests(parsed?.[0]?.hidden_tests);
+  } catch {
+    preservedHiddenTests = [];
+  }
+
   const promptField = stageCard.querySelector('[data-stage-field="prompt_md"]');
   const hiddenField = stageCard.querySelector('[data-stage-field="hidden_count"]');
-  const tests = Array.from(stageCard.querySelectorAll("[data-stage-test]"))
+  const visibleTests = Array.from(
+    stageCard.querySelectorAll('[data-stage-test][data-test-type="visible"]'),
+  )
     .map((testCard) => {
       const inputField = testCard.querySelector('[data-test-field="input_text"]');
       const expectedField = testCard.querySelector('[data-test-field="expected_text"]');
@@ -146,27 +195,62 @@ function readStageFromEditor(editorRoot) {
     })
     .filter((test) => test.input_text && test.expected_text);
 
+  const hiddenTestsFromEditor = Array.from(
+    stageCard.querySelectorAll('[data-stage-test][data-test-type="hidden"]'),
+  )
+    .map((testCard) => {
+      const inputField = testCard.querySelector('[data-test-field="input_text"]');
+      const expectedField = testCard.querySelector('[data-test-field="expected_text"]');
+      return {
+        input_text: String(inputField?.value || "").trim(),
+        expected_text: String(expectedField?.value || "").trim(),
+      };
+    })
+    .filter((test) => test.input_text && test.expected_text);
+
+  const hiddenTests = hiddenTestsFromEditor.length ? hiddenTestsFromEditor : preservedHiddenTests;
+
   return {
     stage_index: 1,
     prompt_md: String(promptField?.value || "").trim(),
-    hidden_count: toNonNegativeInt(hiddenField?.value, 0),
-    visible_tests: tests,
+    hidden_count: Math.max(toNonNegativeInt(hiddenField?.value, 0), hiddenTests.length),
+    visible_tests: visibleTests,
+    hidden_tests: hiddenTests,
   };
 }
 
 function refreshTestNumbers(editorRoot) {
-  const tests = Array.from(editorRoot.querySelectorAll("[data-stage-test]"));
+  const tests = Array.from(
+    editorRoot.querySelectorAll('[data-stage-test][data-test-type="visible"]'),
+  );
   tests.forEach((testCard, testIndex) => {
+    const testNumber = testCard.querySelector("[data-test-number]");
+    if (testNumber) testNumber.textContent = String(testIndex + 1);
+  });
+
+  const hiddenTests = Array.from(
+    editorRoot.querySelectorAll('[data-stage-test][data-test-type="hidden"]'),
+  );
+  hiddenTests.forEach((testCard, testIndex) => {
     const testNumber = testCard.querySelector("[data-test-number]");
     if (testNumber) testNumber.textContent = String(testIndex + 1);
   });
 }
 
-function appendVisibleTest(stageCard, test = emptyTest()) {
-  const testsContainer = stageCard?.querySelector("[data-stage-tests]");
+function syncHiddenCountFromRows(editorRoot) {
+  const hiddenField = editorRoot.querySelector('[data-stage-field="hidden_count"]');
+  if (!hiddenField) return;
+  const hiddenTests = Array.from(
+    editorRoot.querySelectorAll('[data-stage-test][data-test-type="hidden"]'),
+  );
+  hiddenField.value = String(hiddenTests.length);
+}
+
+function appendStageTest(stageCard, test = emptyTest(), type = "visible") {
+  const testsContainer = stageCard?.querySelector(`[data-stage-tests="${type}"]`);
   if (!testsContainer) return;
   const testNumber = testsContainer.querySelectorAll("[data-stage-test]").length + 1;
-  testsContainer.insertAdjacentHTML("beforeend", buildTestRowHtml(test, testNumber));
+  testsContainer.insertAdjacentHTML("beforeend", buildTestRowHtml(test, testNumber, { type }));
 }
 
 export function buildStageEditorHtml(rawStages) {
@@ -204,15 +288,29 @@ export function handleStageEditorAction(event) {
 
   if (action === "add-test") {
     const stageCard = editorRoot.querySelector("[data-stage-card]");
-    if (stageCard) appendVisibleTest(stageCard, emptyTest());
+    const addType = String(trigger.dataset.addType || "visible");
+    if (stageCard)
+      appendStageTest(stageCard, emptyTest(), addType === "hidden" ? "hidden" : "visible");
   } else if (action === "remove-test") {
+    const removeType = String(trigger.dataset.removeType || "visible");
     const testCard = trigger.closest("[data-stage-test]");
-    if (testCard) testCard.remove();
+    if (testCard) {
+      const testsContainer = testCard.parentElement;
+      if (removeType === "visible") {
+        const siblings =
+          testsContainer?.querySelectorAll('[data-stage-test][data-test-type="visible"]') || [];
+        if (siblings.length <= 1) {
+          return true;
+        }
+      }
+      testCard.remove();
+    }
   } else {
     return false;
   }
 
   refreshTestNumbers(editorRoot);
+  syncHiddenCountFromRows(editorRoot);
   const form = editorRoot.closest("form");
   syncStageEditorJsonField(form);
   return true;

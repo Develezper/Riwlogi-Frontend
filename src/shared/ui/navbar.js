@@ -258,7 +258,7 @@ export function renderNavbar() {
           <rect width="32" height="32" rx="8" fill="#7c3aed"/>
           <text x="16" y="22" text-anchor="middle" font-size="16" font-weight="700" fill="white" font-family="ui-sans-serif">R</text>
         </svg>
-        <span>Riwlog</span>
+        <span>Riwlogic</span>
       </a>
 
       <button id="btn-menu" class="md:hidden p-2 rounded-md text-zinc-300 hover:bg-zinc-800" aria-label="Abrir menú" aria-expanded="false" aria-controls="mobile-menu">

@@ -20,8 +20,12 @@ describe("admin-ai-generate form-utils", () => {
         {
           stage_index: 3,
           prompt_md: "Etapa unica",
-          hidden_count: 4,
+          hidden_count: 0,
           visible_tests: [{ input_text: "1 2", expected_text: "3" }],
+          hidden_tests: [
+            { input_text: "oculto 1", expected_text: "x" },
+            { input_text: "oculto 2", expected_text: "y" },
+          ],
         },
       ],
     });
@@ -34,8 +38,12 @@ describe("admin-ai-generate form-utils", () => {
         {
           stage_index: 1,
           prompt_md: "Etapa unica",
-          hidden_count: 4,
+          hidden_count: 2,
           visible_tests: [{ input_text: "1 2", expected_text: "3" }],
+          hidden_tests: [
+            { input_text: "oculto 1", expected_text: "x" },
+            { input_text: "oculto 2", expected_text: "y" },
+          ],
         },
       ],
     });

@@ -28,11 +28,24 @@ function parseStagesJson(rawValue) {
   }
 
   const firstStage = parsed[0] || {};
+  const hiddenTests = Array.isArray(firstStage.hidden_tests)
+    ? firstStage.hidden_tests
+        .map((test) => ({
+          input_text: String(test?.input_text || "").trim(),
+          expected_text: String(test?.expected_text || "").trim(),
+        }))
+        .filter((test) => test.input_text && test.expected_text)
+    : [];
+
   return [
     {
       stage_index: 1,
       prompt_md: String(firstStage.prompt_md || "").trim(),
-      hidden_count: Math.max(0, Number.parseInt(String(firstStage.hidden_count ?? 0), 10) || 0),
+      hidden_count: Math.max(
+        0,
+        Number.parseInt(String(firstStage.hidden_count ?? 0), 10) || 0,
+        hiddenTests.length,
+      ),
       visible_tests: Array.isArray(firstStage.visible_tests)
         ? firstStage.visible_tests
             .map((test) => ({
@@ -41,6 +54,7 @@ function parseStagesJson(rawValue) {
             }))
             .filter((test) => test.input_text && test.expected_text)
         : [],
+      hidden_tests: hiddenTests,
     },
   ];
 }

@@ -103,15 +103,16 @@ function normalizeSingleStage(stages, problemId = "problem") {
   if (!list.length) return [fallbackSingleStage(problemId)];
 
   const first = list[0];
+  const hiddenTests = Array.isArray(first.hidden_tests) ? first.hidden_tests : [];
   return [
     {
       ...first,
       id: String(first.id || `${problemId}-stage-1`),
       stage_index: 1,
       prompt_md: String(first.prompt_md || "Implementa la solución completa."),
-      hidden_count: Number(first.hidden_count || 0),
+      hidden_count: Math.max(Number(first.hidden_count || 0), hiddenTests.length),
       visible_tests: Array.isArray(first.visible_tests) ? first.visible_tests : [],
-      hidden_tests: Array.isArray(first.hidden_tests) ? first.hidden_tests : [],
+      hidden_tests: hiddenTests,
     },
   ];
 }
@@ -176,11 +177,16 @@ function validateStage(raw, index) {
   return {
     id: assertString(value.id, `problem.stages[${index}].id`),
     stage_index: assertNumber(value.stage_index, `problem.stages[${index}].stage_index`),
-    prompt_md: assertString(value.prompt_md || `Etapa ${index + 1}`, `problem.stages[${index}].prompt_md`),
-    hidden_count: Number(value.hidden_count || 0),
-    visible_tests: assertArray(value.visible_tests || [], `problem.stages[${index}].visible_tests`).map(
-      (test, testIndex) =>
-        validateVisibleTest(test, `problem.stages[${index}].visible_tests[${testIndex}]`),
+    prompt_md: assertString(
+      value.prompt_md || `Etapa ${index + 1}`,
+      `problem.stages[${index}].prompt_md`,
+    ),
+    hidden_count: Math.max(Number(value.hidden_count || 0), hidden_tests.length),
+    visible_tests: assertArray(
+      value.visible_tests || [],
+      `problem.stages[${index}].visible_tests`,
+    ).map((test, testIndex) =>
+      validateVisibleTest(test, `problem.stages[${index}].visible_tests[${testIndex}]`),
     ),
     hidden_tests,
   };
