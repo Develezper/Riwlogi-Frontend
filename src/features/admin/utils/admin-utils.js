@@ -5,6 +5,10 @@ export const statusConfig = {
     label: "Publicado",
     className: "text-green-300 bg-green-500/10 border-green-500/30",
   },
+  pending: {
+    label: "Pendiente",
+    className: "text-yellow-300 bg-yellow-500/10 border-yellow-500/30",
+  },
   draft: {
     label: "Borrador",
     className: "text-amber-300 bg-amber-500/10 border-amber-500/30",
@@ -52,6 +56,22 @@ export function formatDateTime(value) {
 export function formatLastActive(value) {
   const formatted = formatDateTime(value);
   return formatted === "-" ? "Sin actividad" : formatted;
+}
+
+export function formatDuration(value) {
+  const durationMs = Number(value || 0);
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return "-";
+
+  const totalSeconds = Math.round(durationMs / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
 export function activityTypeLabel(value) {

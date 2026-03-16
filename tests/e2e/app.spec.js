@@ -39,6 +39,7 @@ function mockApi(page) {
               slug: "two-sum",
               title: "Two Sum",
               difficulty: 1,
+              status: "published",
               tags: ["arrays"],
               acceptance: 80,
               submissions: 100,
@@ -56,6 +57,7 @@ function mockApi(page) {
             slug: "two-sum",
             title: "Two Sum",
             difficulty: 1,
+            status: "published",
             tags: ["arrays"],
             acceptance: 80,
             submissions: 100,
@@ -199,7 +201,9 @@ test("solver can run and submit in single-stage mode", async ({ page }) => {
   await mockApi(page);
   await login(page);
 
-  await page.goto("/#/problem/two-sum");
+  await page.evaluate(() => {
+    window.location.hash = "#/problem/two-sum";
+  });
   await expect(page.getByText(/Casos de prueba/i)).toBeVisible();
 
   await page.getByRole("button", { name: "Ejecutar" }).click();

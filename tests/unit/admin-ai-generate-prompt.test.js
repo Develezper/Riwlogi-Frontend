@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { detectPromptExerciseCount } from "../../src/features/admin/views/admin-ai-generate/prompt-analysis.js";
 import {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   parseAuthResponse,
@@ -25,6 +25,48 @@ describe("api contract parsers", () => {
 
   it("fails on invalid problem list shape", () => {
     expect(() => parseProblemsListResponse([{ id: "x" }])).toThrow();
+  });
+
+  it("normalizes status in problem list items", () => {
+    const parsed = parseProblemsListResponse({
+      items: [
+        {
+          id: "sum-two",
+          slug: "sum-two",
+          title: "Suma dos",
+          difficulty: 1,
+          tags: ["arrays"],
+          status: "pendiente",
+        },
+        {
+          id: "two-sum",
+          slug: "two-sum",
+          title: "Two Sum",
+          difficulty: 1,
+          tags: ["arrays"],
+          status: "published",
+        },
+      ],
+    });
+
+    expect(parsed[0].status).toBe("pending");
+    expect(parsed[1].status).toBe("published");
+  });
+
+  it("does not default missing status to published", () => {
+    const parsed = parseProblemsListResponse({
+      items: [
+        {
+          id: "legacy-problem",
+          slug: "legacy-problem",
+          title: "Legacy",
+          difficulty: 1,
+          tags: ["arrays"],
+        },
+      ],
+    });
+
+    expect(parsed[0].status).toBe("");
   });
 
   it("parses strict problem response", () => {

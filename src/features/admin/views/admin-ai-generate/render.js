@@ -6,15 +6,18 @@ import { DEFAULT_BATCH_COUNT, MAX_BATCH_COUNT } from "./constants.js";
 
 function buildBatchSelectorHtml(state) {
   const generatedBatch = Array.isArray(state.generatedBatch) ? state.generatedBatch : [];
-  if (generatedBatch.length <= 1) return "";
+  const total = Math.max(Number(state.generationTotal || 0), generatedBatch.length);
+  if (total <= 1 && !state.isGenerating) return "";
+
+  const pendingCount = state.isGenerating ? total - generatedBatch.length : 0;
 
   return `
     <div class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-sm font-semibold text-zinc-100">Lote generado</h2>
-        <span class="text-[11px] text-zinc-500">${generatedBatch.length} ejercicios</span>
+        <span class="text-[11px] text-zinc-500">${generatedBatch.length}${state.isGenerating ? ` de ${total}` : ""} ejercicios</span>
       </div>
-      <p class="text-xs text-zinc-500 mt-1">Selecciona cuál quieres revisar o ajustar en este formulario.</p>
+      <p class="text-xs text-zinc-500 mt-1">${state.isGenerating ? "Los ejercicios aparecen conforme se generan. Puedes ir revisándolos." : "Selecciona cuál quieres revisar o ajustar en este formulario."}</p>
       <div class="flex flex-wrap gap-2 mt-3">
         ${generatedBatch
           .map((problem, index) => {
@@ -26,13 +29,16 @@ function buildBatchSelectorHtml(state) {
             return `<button
               type="button"
               data-action="select-generated"
-              data-problem-id="${escapeHtml(problem.id || "")}" 
+              data-problem-id="${escapeHtml(problem.id || "")}"
               class="px-3 py-1.5 rounded-lg border text-xs transition ${className}">
               ${index + 1}. ${escapeHtml(problem.title || `Ejercicio ${index + 1}`)} · ${escapeHtml(
               difficultyLabel(problem.difficulty),
             )}
             </button>`;
           })
+          .join("")}
+        ${Array.from({ length: pendingCount })
+          .map((_, i) => `<span class="px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/30 text-xs text-zinc-600 animate-pulse">${generatedBatch.length + i + 1}. Generando…</span>`)
           .join("")}
       </div>
     </div>
@@ -48,6 +54,7 @@ function buildEditFormHtml(problem) {
   const statement = escapeHtml(problem.statement_md || "");
   const python = escapeHtml(problem.starter_code?.python || "");
   const js = escapeHtml(problem.starter_code?.javascript || "");
+  const ts = escapeHtml(problem.starter_code?.typescript || "");
   const stagesEditor = buildStageEditorHtml(problem.stages);
 
   return `
@@ -90,22 +97,42 @@ function buildEditFormHtml(problem) {
           class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
       </div>
 
-      <div>
-        <label class="block text-xs text-zinc-400 mb-1">Enunciado (Markdown)</label>
+      <div data-md-editor>
+        <div class="flex items-center justify-between mb-1">
+          <label class="block text-xs text-zinc-400">Enunciado (Markdown)</label>
+          <button type="button" data-md-toggle
+            class="text-[11px] text-zinc-500 hover:text-zinc-300 transition px-2 py-0.5 rounded border border-zinc-700 hover:border-zinc-500">
+            Preview
+          </button>
+        </div>
         <textarea name="statement_md" rows="7"
           class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition resize-none">${statement}</textarea>
+        <div data-md-preview
+          class="hidden w-full min-h-40 px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-sm overflow-auto prose-content">
+        </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label class="block text-xs text-zinc-400 mb-1">Código inicial Python</label>
-          <textarea name="starter_python" rows="6"
-            class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100 focus:outline-none focus:border-brand transition resize-none">${python}</textarea>
+          <div data-code-editor="python" class="rounded-lg overflow-hidden border border-zinc-700">
+            <textarea name="starter_python" data-hidden-input class="hidden">${python}</textarea>
+            <div data-cm-mount></div>
+          </div>
         </div>
         <div>
           <label class="block text-xs text-zinc-400 mb-1">Código inicial JavaScript</label>
-          <textarea name="starter_javascript" rows="6"
-            class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-100 focus:outline-none focus:border-brand transition resize-none">${js}</textarea>
+          <div data-code-editor="javascript" class="rounded-lg overflow-hidden border border-zinc-700">
+            <textarea name="starter_javascript" data-hidden-input class="hidden">${js}</textarea>
+            <div data-cm-mount></div>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-zinc-400 mb-1">Código inicial TypeScript</label>
+          <div data-code-editor="typescript" class="rounded-lg overflow-hidden border border-zinc-700">
+            <textarea name="starter_typescript" data-hidden-input class="hidden">${ts}</textarea>
+            <div data-cm-mount></div>
+          </div>
         </div>
       </div>
 
@@ -131,44 +158,7 @@ function buildEditFormHtml(problem) {
   `;
 }
 
-function buildGenerationLoadingHtml(state) {
-  if (!state.isGenerating) return "";
-
-  const total = Math.max(1, Number(state.generationTotal || 0));
-  const current = Math.max(0, Number(state.generationCurrent || 0));
-  const percent = Math.max(0, Math.min(100, Math.round((current / total) * 100)));
-  const message = state.generationMessage || "Preparando generación…";
-
-  return `
-    <div class="rounded-xl border border-brand/40 bg-brand/10 p-4 animate-fade-in">
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <div class="w-6 h-6 border-2 border-brand/40 border-t-brand rounded-full animate-spin"></div>
-          <div>
-            <p class="text-sm font-semibold text-zinc-100">Creando ejercicios con IA…</p>
-            <p class="text-xs text-zinc-300 mt-0.5">${escapeHtml(message)}</p>
-          </div>
-        </div>
-        <span class="text-xs text-brand font-semibold">${current}/${total}</span>
-      </div>
-
-      <div class="mt-3 h-2 rounded-full bg-zinc-800 overflow-hidden">
-        <div class="h-full rounded-full bg-brand ai-gen-progress-fill" style="width:${percent}%"></div>
-      </div>
-
-      <div class="mt-3 flex items-center gap-1.5 text-zinc-300 text-xs">
-        <span class="ai-dot w-1.5 h-1.5 rounded-full bg-brand"></span>
-        <span class="ai-dot w-1.5 h-1.5 rounded-full bg-brand"></span>
-        <span class="ai-dot w-1.5 h-1.5 rounded-full bg-brand"></span>
-        <span class="ml-1">Esto puede tardar unos segundos por ejercicio.</span>
-      </div>
-    </div>
-  `;
-}
-
 export function renderPromptPhase(container, state) {
-  const disabledAttr = state.isGenerating ? "disabled" : "";
-
   container.innerHTML = `
     ${adminNav("generate")}
     <section class="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -180,7 +170,6 @@ export function renderPromptPhase(container, state) {
       </div>
 
       ${state.error ? `<div class="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">${escapeHtml(state.error)}</div>` : ""}
-      ${buildGenerationLoadingHtml(state)}
 
       <div class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
         <form id="generate-ai-form" novalidate>
@@ -191,7 +180,6 @@ export function renderPromptPhase(container, state) {
             rows="8"
             required
             minlength="10"
-            ${disabledAttr}
             class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition resize-none"
             placeholder="Ejemplo: Crea ejercicios sobre arrays y two pointers para práctica técnica en entrevistas."
           >${escapeHtml(state.lastPrompt || "")}</textarea>
@@ -204,7 +192,6 @@ export function renderPromptPhase(container, state) {
                 name="batch_count"
                 min="1"
                 max="${MAX_BATCH_COUNT}"
-                ${disabledAttr}
                 value="${escapeHtml(String(state.batchCount || DEFAULT_BATCH_COUNT))}"
                 class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-brand transition" />
               <p class="text-[11px] text-zinc-500 mt-1">Default: 3 (fácil, intermedio, difícil).</p>
@@ -225,9 +212,8 @@ export function renderPromptPhase(container, state) {
 
           <div class="flex justify-end mt-4">
             <button type="submit"
-              ${disabledAttr}
               class="px-6 py-2 rounded-lg bg-brand text-white hover:bg-brand-dark transition text-sm font-medium">
-              ${state.isGenerating ? "Generando…" : "Generar con IA"}
+              Generar con IA
             </button>
           </div>
         </form>
@@ -236,7 +222,48 @@ export function renderPromptPhase(container, state) {
   `;
 }
 
+function buildEditPhaseGenerationLoadingHtml(state) {
+  if (!state.isGenerating) return "";
+
+  const total = Math.max(1, Number(state.generationTotal || 0));
+  const current = Math.max(0, Number(state.generationCurrent || 0));
+  const percent = Math.max(0, Math.min(100, Math.round((current / total) * 100)));
+  const message = state.generationMessage || "Generando ejercicios…";
+
+  return `
+    <div class="rounded-xl border border-brand/40 bg-brand/10 p-4">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-5 h-5 border-2 border-brand/40 border-t-brand rounded-full animate-spin"></div>
+          <div>
+            <p class="text-sm font-semibold text-zinc-100">${escapeHtml(message)}</p>
+            <p class="text-xs text-zinc-400 mt-0.5">Puedes ir revisando los ejercicios listos mientras se generan los demás.</p>
+          </div>
+        </div>
+        <span class="text-xs text-brand font-semibold">${current}/${total}</span>
+      </div>
+      <div class="mt-3 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+        <div class="h-full rounded-full bg-brand ai-gen-progress-fill" style="width:${percent}%"></div>
+      </div>
+    </div>
+  `;
+}
+
+function buildWaitingForFirstProblemHtml() {
+  return `
+    <div class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
+      <div class="flex flex-col items-center justify-center py-12 gap-4">
+        <div class="w-8 h-8 border-2 border-brand/40 border-t-brand rounded-full animate-spin"></div>
+        <p class="text-sm text-zinc-400">Generando el primer ejercicio…</p>
+      </div>
+    </div>
+  `;
+}
+
 export function renderEditPhase(container, state) {
+  const hasProblems = (state.generatedBatch || []).length > 0;
+  const showBatchActions = hasProblems && !state.isGenerating && (state.generatedBatch || []).length > 1;
+
   container.innerHTML = `
     ${adminNav("generate")}
     <section class="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -252,6 +279,16 @@ export function renderEditPhase(container, state) {
         </span>
       </div>
 
+      ${buildEditPhaseGenerationLoadingHtml(state)}
+
+      ${
+        state.restoredFromDraft
+          ? `<div class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              Borrador local restaurado. Estos ejercicios no han sido guardados en el servidor.
+            </div>`
+          : ""
+      }
+
       ${
         state.savedProblemId
           ? `<div class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
@@ -264,7 +301,7 @@ export function renderEditPhase(container, state) {
       ${state.error ? `<div class="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">${escapeHtml(state.error)}</div>` : ""}
 
       ${
-        (state.generatedBatch || []).length > 1
+        showBatchActions
           ? `<div class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
               <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
@@ -286,9 +323,12 @@ export function renderEditPhase(container, state) {
 
       ${buildBatchSelectorHtml(state)}
 
-      <div class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
-        ${buildEditFormHtml(state.generatedProblem)}
-      </div>
+      ${state.generatedProblem
+        ? `<div class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
+            ${buildEditFormHtml(state.generatedProblem)}
+          </div>`
+        : buildWaitingForFirstProblemHtml()
+      }
     </section>
   `;
 }

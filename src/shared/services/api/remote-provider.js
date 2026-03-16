@@ -379,11 +379,44 @@ export const remoteApi = {
     },
 
     async problems(params = {}) {
-      const { payload } = await request(API_CONTRACT.adminProblems, {
-        requireAuth: true,
-        query: params,
-      });
-      return parseAdminProblemsResponse(payload);
+      const hasExplicitPage = Object.prototype.hasOwnProperty.call(params, "page");
+      if (hasExplicitPage) {
+        const { payload } = await request(API_CONTRACT.adminProblems, {
+          requireAuth: true,
+          query: params,
+        });
+        return parseAdminProblemsResponse(payload);
+      }
+
+      const baseQuery = { ...params };
+      const limit = Number(baseQuery.limit);
+      baseQuery.limit = Number.isFinite(limit) && limit > 0 ? limit : 100;
+
+      let page = 1;
+      const allItems = [];
+
+      while (true) {
+        const { payload } = await request(API_CONTRACT.adminProblems, {
+          requireAuth: true,
+          query: {
+            ...baseQuery,
+            page,
+          },
+        });
+
+        allItems.push(...parseAdminProblemsResponse(payload));
+
+        const hasNext =
+          payload &&
+          typeof payload === "object" &&
+          !Array.isArray(payload) &&
+          payload.has_next === true;
+
+        if (!hasNext) break;
+        page += 1;
+      }
+
+      return allItems;
     },
 
     async generateProblem(data) {

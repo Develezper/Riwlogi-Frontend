@@ -75,6 +75,18 @@ function validateDifficulty(value, context) {
   return difficulty;
 }
 
+function normalizeProblemStatus(rawStatus, fallback = "") {
+  const value = String(rawStatus || fallback)
+    .trim()
+    .toLowerCase();
+
+  if (value === "publicado") return "published";
+  if (value === "borrador") return "draft";
+  if (value === "archivado") return "archived";
+  if (value === "pendiente") return "pending";
+  return value;
+}
+
 function fallbackSingleStage(problemId = "problem") {
   return {
     id: `${problemId}-stage-1`,
@@ -117,6 +129,7 @@ function validateUser(raw, context = "user") {
 
 function validateProblemSummary(raw, index = 0) {
   const value = assertObject(raw, `problems.items[${index}]`);
+  const status = normalizeProblemStatus(value.status, "");
 
   return {
     id: assertString(value.id, `problems.items[${index}].id`),
@@ -128,6 +141,7 @@ function validateProblemSummary(raw, index = 0) {
     ),
     acceptance: Number(value.acceptance || 0),
     submissions: Number(value.submissions || 0),
+    status,
     stages_count: 1,
   };
 }
@@ -240,6 +254,7 @@ function validateProfile(raw) {
     stats: {
       total_score: Number(stats.total_score || 0),
       solved: Number(stats.solved || 0),
+      total_problems: Number(stats.total_problems || 0),
       by_difficulty: {
         easy: Number(byDifficulty.easy || 0),
         medium: Number(byDifficulty.medium || 0),
@@ -248,6 +263,7 @@ function validateProfile(raw) {
     },
     streak: Number(value.streak || 0),
     rank: Number(value.rank || 0),
+    total_users: Number(value.total_users || 0),
     badges: assertArray(value.badges || [], "profile.badges").map((badge, index) => {
       const item = assertObject(badge, `profile.badges[${index}]`);
       return {
@@ -273,6 +289,7 @@ function validateProfileSubmission(raw, index) {
     language: assertString(value.language || "python", `profile.submissions.items[${index}].language`),
     final_score: Number(value.final_score || 0),
     runtime_ms: Number(value.runtime_ms || 0),
+    solve_duration_ms: Number(value.solve_duration_ms || 0),
     submitted_at: assertString(value.submitted_at || new Date().toISOString(), `profile.submissions.items[${index}].submitted_at`),
     stage_results: value.stage_results && typeof value.stage_results === "object" ? value.stage_results : {},
   };
@@ -295,6 +312,7 @@ function validateAdminOverview(raw) {
       accepted_submissions: Number(kpis.accepted_submissions || 0),
       acceptance_rate: Number(kpis.acceptance_rate || 0),
       ai_generated_problems: Number(kpis.ai_generated_problems || 0),
+      avg_resolution_time_ms: Number(kpis.avg_resolution_time_ms || 0),
     },
     top_tags: topTags.map((row, index) => {
       const item = assertObject(row, `admin.overview.top_tags[${index}]`);
@@ -337,7 +355,7 @@ function validateAdminUser(raw, index) {
 function validateAdminProblem(raw, index) {
   const value = assertObject(raw, `admin.problems.items[${index}]`);
   const problem = validateProblem(value);
-  const status = String(value.status || "draft");
+  const status = normalizeProblemStatus(value.status, "draft");
   const source = String(value.source || "custom");
 
   return {
@@ -354,6 +372,9 @@ function validateAdminProblem(raw, index) {
       `admin.problems.items[${index}].updated_at`,
     ),
     last_generated_prompt: value.last_generated_prompt ? String(value.last_generated_prompt) : "",
+    accepted_submissions: Number(value.accepted_submissions || 0),
+    avg_solve_time_ms: Number(value.avg_solve_time_ms || 0),
+    fastest_solve_time_ms: Number(value.fastest_solve_time_ms || 0),
   };
 }
 
