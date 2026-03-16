@@ -34,7 +34,7 @@ function normalizeSingleStage(rawStages) {
             input_text: String(test?.input_text || "").trim(),
             expected_text: String(test?.expected_text || "").trim(),
           }))
-          .filter((test) => test.input_text || test.expected_text)
+          .filter((test) => test.input_text && test.expected_text)
       : [],
   };
 }

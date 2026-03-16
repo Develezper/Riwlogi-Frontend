@@ -94,6 +94,7 @@ function fallbackSingleStage(problemId = "problem") {
     prompt_md: "Implementa la solución completa.",
     hidden_count: 0,
     visible_tests: [],
+    hidden_tests: [],
   };
 }
 
@@ -110,6 +111,7 @@ function normalizeSingleStage(stages, problemId = "problem") {
       prompt_md: String(first.prompt_md || "Implementa la solución completa."),
       hidden_count: Number(first.hidden_count || 0),
       visible_tests: Array.isArray(first.visible_tests) ? first.visible_tests : [],
+      hidden_tests: Array.isArray(first.hidden_tests) ? first.hidden_tests : [],
     },
   ];
 }
@@ -156,6 +158,20 @@ function validateVisibleTest(raw, context) {
 
 function validateStage(raw, index) {
   const value = assertObject(raw, `problem.stages[${index}]`);
+  const hiddenTestsFromList = assertArray(value.hidden_tests || [], `problem.stages[${index}].hidden_tests`).map(
+    (test, testIndex) =>
+      validateVisibleTest(test, `problem.stages[${index}].hidden_tests[${testIndex}]`),
+  );
+
+  const hiddenTestsFromTests = assertArray(value.tests || [], `problem.stages[${index}].tests`)
+    .map((test, testIndex) => {
+      const testValue = assertObject(test, `problem.stages[${index}].tests[${testIndex}]`);
+      if (!Boolean(testValue.is_hidden)) return null;
+      return validateVisibleTest(testValue, `problem.stages[${index}].tests[${testIndex}]`);
+    })
+    .filter(Boolean);
+
+  const hidden_tests = hiddenTestsFromList.length ? hiddenTestsFromList : hiddenTestsFromTests;
 
   return {
     id: assertString(value.id, `problem.stages[${index}].id`),
@@ -166,6 +182,7 @@ function validateStage(raw, index) {
       (test, testIndex) =>
         validateVisibleTest(test, `problem.stages[${index}].visible_tests[${testIndex}]`),
     ),
+    hidden_tests,
   };
 }
 

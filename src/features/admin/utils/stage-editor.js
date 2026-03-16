@@ -144,7 +144,7 @@ function readStageFromEditor(editorRoot) {
         expected_text: String(expectedField?.value || "").trim(),
       };
     })
-    .filter((test) => test.input_text || test.expected_text);
+    .filter((test) => test.input_text && test.expected_text);
 
   return {
     stage_index: 1,
@@ -177,9 +177,6 @@ export function buildStageEditorHtml(rawStages) {
     <div data-stage-editor class="space-y-3">
       <textarea name="stages_json" data-stage-json hidden>${hiddenJson}</textarea>
       ${buildStageCardHtml(stage)}
-      <p class="text-[11px] text-zinc-500">
-        Esta plataforma usa una sola etapa por ejercicio.
-      </p>
     </div>
   `;
 }
