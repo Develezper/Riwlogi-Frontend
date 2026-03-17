@@ -71,16 +71,21 @@ export async function leaderboardView(container) {
       <div class="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
         ${top3
           .map((entry, index) => {
-            const order = index === 0 ? "sm:order-2" : index === 1 ? "sm:order-1" : "sm:order-3";
+            const emphasis =
+              index === 0
+                ? "sm:scale-[1.02] border-2 shadow-[0_16px_40px_-20px_rgba(250,204,21,0.45)]"
+                : "";
             const color =
               index === 0
                 ? "from-yellow-500/20 to-yellow-500/5 border-yellow-500/30"
                 : index === 1
                 ? "from-zinc-400/20 to-zinc-400/5 border-zinc-400/30"
                 : "from-amber-700/20 to-amber-700/5 border-amber-700/30";
+            const rankLabel = index === 0 ? "1" : index === 1 ? "2" : "3";
 
             return `
-              <div class="${order} relative overflow-hidden rounded-xl border bg-gradient-to-b ${color} p-6" style="view-transition-name: lb-${entry.username}">
+              <div class="${emphasis} relative overflow-hidden rounded-xl border bg-gradient-to-b ${color} p-6 transition-transform" style="view-transition-name: lb-${entry.username}">
+                <span class="absolute left-3 top-3 rounded-full border border-zinc-700 bg-zinc-950/70 px-2 py-0.5 text-[10px] font-bold tracking-wide text-zinc-300">${rankLabel}</span>
                 <div class="flex flex-col items-center text-center">
                   <div class="w-16 h-16 rounded-full bg-zinc-900/70 border border-zinc-700 flex items-center justify-center text-xl font-bold text-white mb-3">
                     ${entry.avatar || entry.username[0].toUpperCase()}
