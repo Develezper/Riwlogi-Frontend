@@ -27,6 +27,27 @@ function normalizeStatus(value) {
     .toLowerCase();
 }
 
+function toProblemSortTimestamp(problem) {
+  const updatedAt = new Date(problem?.updated_at).getTime();
+  if (Number.isFinite(updatedAt)) return updatedAt;
+
+  const createdAt = new Date(problem?.created_at).getTime();
+  return Number.isFinite(createdAt) ? createdAt : 0;
+}
+
+function sortProblemsByMostRecent(items) {
+  return items.slice().sort((left, right) => {
+    const byRecent = toProblemSortTimestamp(right) - toProblemSortTimestamp(left);
+    if (byRecent !== 0) return byRecent;
+
+    const byCreatedAt =
+      (new Date(right?.created_at).getTime() || 0) - (new Date(left?.created_at).getTime() || 0);
+    if (byCreatedAt !== 0) return byCreatedAt;
+
+    return String(left?.id || "").localeCompare(String(right?.id || ""));
+  });
+}
+
 function paginate(items, page, pageSize) {
   const safeSize = Number.isFinite(pageSize) && pageSize > 0 ? pageSize : PAGE_SIZE_OPTIONS[1];
   const totalItems = Array.isArray(items) ? items.length : 0;
@@ -254,19 +275,19 @@ export async function adminProblemsView(container) {
         api.admin.overview(),
       ]);
       if (!isMounted) return;
-      state.problems = problems;
+      state.problems = sortProblemsByMostRecent(Array.isArray(problems) ? problems : []);
       state.activity = overview.recent_activity || [];
       state.error = null;
       const statusFilter = normalizeStatus(state.statusFilter || "all");
       const visibleProblems =
         statusFilter === "all"
-          ? problems
-          : problems.filter((problem) => normalizeStatus(problem.status) === statusFilter);
+          ? state.problems
+          : state.problems.filter((problem) => normalizeStatus(problem.status) === statusFilter);
 
       if (!keepSelection || !state.selectedId) {
         state.selectedId = visibleProblems[0]?.id || null;
       } else {
-        const stillExists = problems.some((p) => p.id === state.selectedId);
+        const stillExists = state.problems.some((p) => p.id === state.selectedId);
         const stillVisible = visibleProblems.some((p) => p.id === state.selectedId);
         if (!stillExists || !stillVisible) state.selectedId = visibleProblems[0]?.id || null;
       }
