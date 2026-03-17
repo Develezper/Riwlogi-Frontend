@@ -18,15 +18,17 @@ export async function transitionView(main, renderView) {
   gsap.killTweensOf(main);
   gsap.set(main, { opacity: 0, y: 10 });
 
-  const cleanup = await renderView();
+  // Start rendering immediately so loading states can be shown without waiting.
+  const cleanupPromise = Promise.resolve().then(() => renderView());
 
   gsap.to(main, {
     opacity: 1,
     y: 0,
-    duration: 0.45,
+    duration: 0.22,
     ease: "power2.inOut",
     overwrite: true,
   });
 
+  const cleanup = await cleanupPromise;
   return cleanup;
 }
