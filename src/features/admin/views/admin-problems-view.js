@@ -120,9 +120,39 @@ function renderActivityFeed(problem, activity) {
     .join("");
 }
 
+function getSearchFocusSnapshot(container) {
+  const activeElement = document.activeElement;
+  if (!activeElement || !container.contains(activeElement)) return null;
+  if (activeElement.getAttribute("data-action") !== "filter-search") return null;
+
+  return {
+    selectionStart:
+      typeof activeElement.selectionStart === "number" ? activeElement.selectionStart : null,
+    selectionEnd: typeof activeElement.selectionEnd === "number" ? activeElement.selectionEnd : null,
+  };
+}
+
+function restoreSearchFocus(container, snapshot) {
+  if (!snapshot) return;
+  const searchInput = container.querySelector("[data-action='filter-search']");
+  if (!searchInput) return;
+
+  searchInput.focus({ preventScroll: true });
+  if (
+    typeof snapshot.selectionStart === "number" &&
+    typeof snapshot.selectionEnd === "number" &&
+    typeof searchInput.setSelectionRange === "function"
+  ) {
+    searchInput.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
+  }
+}
+
 function renderView(container, state) {
+  const searchFocusSnapshot = getSearchFocusSnapshot(container);
+
   if (state.loading) {
     container.innerHTML = `${adminNav("problems")}<div class="p-8">${spinner("lg")}</div>`;
+    restoreSearchFocus(container, searchFocusSnapshot);
     return;
   }
 
@@ -288,6 +318,8 @@ function renderView(container, state) {
       </div>
     </section>
   `;
+
+  restoreSearchFocus(container, searchFocusSnapshot);
 }
 
 export async function adminProblemsView(container) {
