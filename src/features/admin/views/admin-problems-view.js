@@ -27,6 +27,33 @@ function normalizeStatus(value) {
     .toLowerCase();
 }
 
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function matchesProblemSearch(problem, searchTerm) {
+  const normalizedSearch = normalizeSearchText(searchTerm);
+  if (!normalizedSearch) return true;
+
+  const tags = Array.isArray(problem?.tags) ? problem.tags : [];
+  const haystack = [
+    problem?.title,
+    problem?.slug,
+    problem?.id,
+    problem?.source,
+    problem?.status,
+    tags.join(" "),
+  ]
+    .map((item) => normalizeSearchText(item))
+    .join(" ");
+
+  return haystack.includes(normalizedSearch);
+}
+
 function toProblemSortTimestamp(problem) {
   const updatedAt = new Date(problem?.updated_at).getTime();
   if (Number.isFinite(updatedAt)) return updatedAt;
@@ -101,10 +128,12 @@ function renderView(container, state) {
 
   const problems = Array.isArray(state.problems) ? state.problems : [];
   const statusFilter = normalizeStatus(state.statusFilter || "all");
-  const filteredProblems =
-    statusFilter === "all"
-      ? problems
-      : problems.filter((problem) => normalizeStatus(problem.status) === statusFilter);
+  const searchQuery = String(state.searchQuery || "");
+  const filteredProblems = problems
+    .filter((problem) =>
+      statusFilter === "all" ? true : normalizeStatus(problem.status) === statusFilter,
+    )
+    .filter((problem) => matchesProblemSearch(problem, searchQuery));
   const pagination = paginate(filteredProblems, state.page, state.pageSize);
   state.page = pagination.page;
   state.pageSize = pagination.pageSize;
@@ -130,11 +159,24 @@ function renderView(container, state) {
 
       <div class="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
         <div class="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 overflow-x-auto">
-          <div class="mb-4 flex items-center justify-between gap-3">
-            <label class="text-xs text-zinc-400" for="admin-problems-status-filter">Filtrar por estado</label>
-            <select id="admin-problems-status-filter" data-action="filter-status" class="px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-200 text-xs focus:outline-none focus:border-brand transition">
-              ${STATUS_FILTER_OPTIONS.map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === statusFilter ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
-            </select>
+          <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div class="flex-1 min-w-[220px]">
+              <label class="text-xs text-zinc-400" for="admin-problems-search">Buscar ejercicio</label>
+              <input
+                id="admin-problems-search"
+                data-action="filter-search"
+                type="search"
+                value="${escapeHtml(searchQuery)}"
+                placeholder="Ej: pilas, grafos, vocales"
+                class="mt-1 w-full px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-200 text-sm focus:outline-none focus:border-brand transition"
+              />
+            </div>
+            <div class="min-w-[170px]">
+              <label class="text-xs text-zinc-400" for="admin-problems-status-filter">Filtrar por estado</label>
+              <select id="admin-problems-status-filter" data-action="filter-status" class="mt-1 w-full px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-200 text-sm focus:outline-none focus:border-brand transition">
+                ${STATUS_FILTER_OPTIONS.map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === statusFilter ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
+              </select>
+            </div>
           </div>
           <table class="w-full min-w-[700px] text-sm">
             <thead>
@@ -256,6 +298,7 @@ export async function adminProblemsView(container) {
     activity: [],
     selectedId: null,
     statusFilter: "all",
+    searchQuery: "",
     page: 1,
     pageSize: PAGE_SIZE_OPTIONS[1],
   };
@@ -279,10 +322,11 @@ export async function adminProblemsView(container) {
       state.activity = overview.recent_activity || [];
       state.error = null;
       const statusFilter = normalizeStatus(state.statusFilter || "all");
-      const visibleProblems =
-        statusFilter === "all"
-          ? state.problems
-          : state.problems.filter((problem) => normalizeStatus(problem.status) === statusFilter);
+      const visibleProblems = state.problems
+        .filter((problem) =>
+          statusFilter === "all" ? true : normalizeStatus(problem.status) === statusFilter,
+        )
+        .filter((problem) => matchesProblemSearch(problem, state.searchQuery));
 
       if (!keepSelection || !state.selectedId) {
         state.selectedId = visibleProblems[0]?.id || null;
@@ -304,12 +348,15 @@ export async function adminProblemsView(container) {
 
   container.innerHTML = `${adminNav("problems")}<div class="p-8">${spinner("lg")}</div>`;
 
-  const applyStatusFilter = () => {
+  const applyFilters = () => {
     state.page = 1;
-    const visibleProblems =
-      state.statusFilter === "all"
-        ? state.problems
-        : state.problems.filter((problem) => normalizeStatus(problem.status) === state.statusFilter);
+    const visibleProblems = state.problems
+      .filter((problem) =>
+        state.statusFilter === "all"
+          ? true
+          : normalizeStatus(problem.status) === state.statusFilter,
+      )
+      .filter((problem) => matchesProblemSearch(problem, state.searchQuery));
 
     if (!visibleProblems.some((problem) => problem.id === state.selectedId)) {
       state.selectedId = visibleProblems[0]?.id || null;
@@ -323,11 +370,18 @@ export async function adminProblemsView(container) {
     if (!trigger || !container.contains(trigger)) return;
 
     const action = trigger.dataset.action;
-    if (action !== "filter-status") return;
+    if (action === "filter-status") {
+      const selectedValue = normalizeStatus(trigger.value || "all");
+      state.statusFilter = selectedValue || "all";
+      applyFilters();
+    }
+  };
 
-    const selectedValue = normalizeStatus(trigger.value || "all");
-    state.statusFilter = selectedValue || "all";
-    applyStatusFilter();
+  const onInput = (event) => {
+    const trigger = event.target.closest("[data-action='filter-search']");
+    if (!trigger || !container.contains(trigger)) return;
+    state.searchQuery = String(trigger.value || "");
+    applyFilters();
   };
 
   const onClick = async (event) => {
@@ -408,6 +462,7 @@ export async function adminProblemsView(container) {
   };
 
   container.addEventListener("change", onChange);
+  container.addEventListener("input", onInput);
   container.addEventListener("change", onPageSizeChange);
   container.addEventListener("click", onClick);
 
@@ -418,6 +473,7 @@ export async function adminProblemsView(container) {
     isMounted = false;
     window.clearInterval(pollTimer);
     container.removeEventListener("change", onChange);
+    container.removeEventListener("input", onInput);
     container.removeEventListener("change", onPageSizeChange);
     container.removeEventListener("click", onClick);
   };
