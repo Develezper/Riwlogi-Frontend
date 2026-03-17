@@ -30,6 +30,20 @@ const routes = [
 let activeCleanup = null;
 let renderToken = 0;
 
+function resetScrollPosition() {
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
+  if (document.scrollingElement) {
+    document.scrollingElement.scrollTop = 0;
+    document.scrollingElement.scrollLeft = 0;
+  }
+
+  document.documentElement.scrollTop = 0;
+  document.documentElement.scrollLeft = 0;
+  document.body.scrollTop = 0;
+  document.body.scrollLeft = 0;
+}
+
 function cleanupView() {
   if (typeof activeCleanup === "function") {
     try {
@@ -44,6 +58,10 @@ function cleanupView() {
 
 export const router = {
   init() {
+    if (window.history && "scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+
     window.addEventListener("hashchange", () => this._resolve());
     this._resolve();
   },
@@ -111,6 +129,7 @@ export const router = {
   _render(main, route, params) {
     const currentToken = ++renderToken;
     cleanupView();
+    resetScrollPosition();
 
     Promise.resolve(transitionView(main, () => route.view(main, params)))
       .then((cleanup) => {
@@ -121,7 +140,11 @@ export const router = {
 
         activeCleanup = typeof cleanup === "function" ? cleanup : null;
         if (typeof main.focus === "function") {
-          main.focus();
+          try {
+            main.focus({ preventScroll: true });
+          } catch {
+            main.focus();
+          }
         }
       })
       .catch((error) => {
